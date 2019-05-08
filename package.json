@@ -1,0 +1,32 @@
+{
+  "name": "lol-explorer-server",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon --ignore data/**/*.json --exec babel-node ./src/bin/www",
+    "build": "babel -d ./build ./src",
+    "start": "node ./build/bin/www"
+  },
+  "dependencies": {
+    "@babel/cli": "^7.4.4",
+    "@babel/core": "^7.4.4",
+    "@babel/node": "^7.2.2",
+    "@babel/preset-env": "^7.4.4",
+    "@babel/preset-flow": "^7.0.0",
+    "axios": "^0.18.0",
+    "cookie-parser": "~1.4.4",
+    "debug": "~2.6.9",
+    "express": "~4.16.1",
+    "http-errors": "~1.6.3",
+    "jade": "~1.11.0",
+    "mongoose": "^5.5.6",
+    "morgan": "~1.9.1",
+    "redis": "^2.8.0"
+  },
+  "babel": {
+    "presets": [
+      "@babel/preset-flow",
+      "@babel/preset-env"
+    ]
+  }
+}

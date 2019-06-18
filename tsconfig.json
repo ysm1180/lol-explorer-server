@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "es2017",
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "sourceMap": true,
+    "jsx": "react",
+    "strict": true,
+    "noEmit": true,
+    "outDir": "./dist"
+  },
+  "plugins": [
+    {
+      "name": "typescript-tslint-plugin"
+    }
+  ],
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "out"],
+  "compileOnSave": false
+}

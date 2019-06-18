@@ -1,12 +1,17 @@
-# LOL EXPLORER
+# LOL EXPLORER REST API SERVER
 
 ## DEV
+```shell
+$ yarn build:dev
+$ yarn start
 ```
-npm run dev
+
+## INIT MONGO DB
+```shell
+$ yarn init:mongo
 ```
 
 ## PRODUCTION
-```
-npm run build
-npm run start
+```shell
+$ yarn build:prod
 ```

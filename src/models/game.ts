@@ -1,4 +1,7 @@
-import { model, Schema } from 'mongoose';
+import { Document, model, Schema } from 'mongoose';
+import { IGameApiData } from '../lib/demacia/models';
+
+export interface IGameModel extends IGameApiData, Document {}
 
 var gameSchema = new Schema({
   gameId: Number,
@@ -22,4 +25,4 @@ var gameSchema = new Schema({
   },
 });
 
-export default model('game', gameSchema);
+export default model<IGameModel>('game', gameSchema);

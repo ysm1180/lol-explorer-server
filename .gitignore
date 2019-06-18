@@ -87,3 +87,6 @@ typings/
 build/
 *.http
 data/
+
+# awcache
+.awcache

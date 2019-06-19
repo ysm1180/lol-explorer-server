@@ -4,41 +4,14 @@ import * as lodash from 'lodash';
 import { escape } from 'querystring';
 import { format } from 'util';
 import { LOL_API, LOL_URL } from '../constants';
-import { IGameApiData, ILeagueApiData, IMatchApiData, ISummonerApiData } from '../lib/demacia/models';
+import { IGameApiData, IMatchApiData, ISummonerApiData } from '../lib/demacia/models';
 import { callLolApi, getLastSeason, getLastVersion, IAjaxGet, sequentialCallLolApis } from '../lib/lol';
 import Game from '../models/game';
-import League, { ILeagueModel } from '../models/league';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
+import { getOrCreateLeagueData } from '../models/util/league';
 
 const router = Router();
-
-async function getOrCreateLeagueData(id: string, lastSeason: number): Promise<ILeagueModel[]> {
-  return League.find({ summonerId: id, season: lastSeason })
-    .then(async (items) => {
-      let leagueList = items;
-      if (items.length == 0) {
-        const leagueUrl = format(LOL_API.GET_SUMMONER_LEAGUE_BY_ID, escape(id));
-        try {
-          const leagueDataList = await callLolApi<ILeagueApiData[]>(leagueUrl);
-          for (var i = 0; i < leagueDataList.length; i++) {
-            leagueDataList[i].season = lastSeason;
-          }
-          const docs = await League.collection.insertMany(leagueDataList);
-          console.info('%d leagues were stored.', docs.insertedCount);
-
-          leagueList = docs.ops;
-        } catch (err) {
-          return Promise.reject(err);
-        }
-      }
-
-      return Promise.resolve(leagueList);
-    })
-    .catch((err) => {
-      return Promise.reject(err);
-    });
-}
 
 router.get('/:name', function(req, res, next) {
   Summoner.findOne(
@@ -62,9 +35,6 @@ router.get('/:name', function(req, res, next) {
                 summoner = new Summoner(summonerData);
               } else {
                 summoner = summoners[0];
-                if (!summoner) {
-                  summoner = new Summoner(summonerData);
-                }
                 summoner.name = req.params.name;
               }
               summoner.save();
@@ -177,26 +147,6 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
               });
           };
 
-          // const getGameApiCallingInfo = () => {
-          //   return Game.find({ gameId: Number(gameId) })
-          //     .limit(1)
-          //     .then(async (games) => {
-          //       if (games.length === 0) {
-          //         try {
-          //           const url = format(LOL_API.GET_MATCH_INFO_BY_GAME_ID, gameId);
-          //           const gameData = await callLolApi<IGameData>(url);
-          //           const game = new Game(gameData);
-          //           game.save();
-
-          //           return game;
-          //         } catch (err) {
-          //           return Promise.reject(err);
-          //         }
-          //       } else {
-          //         return games[0];
-          //       }
-          //     });
-          // };
           promises.push(Promise.resolve(getGameApiCallingInfo()));
         }
 

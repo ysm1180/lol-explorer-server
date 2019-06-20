@@ -4,13 +4,13 @@ import { ReadStrorage } from './storage';
 import { ISpellDataDragon } from '../types/spell';
 
 class SpellReadStrorage extends ReadStrorage {
-  public get(version: string, spellId: string): ISpellDataDragon {
+  public get(dataFolderPath: string, version: string, spellId: string): ISpellDataDragon {
     const value = this.getCache(version, spellId);
     if (value !== null) {
       return value;
     }
 
-    const allSpellDataFile = path.join(__dirname, 'data', 'spell', version, 'spell_all.json');
+    const allSpellDataFile = path.join(dataFolderPath, 'spell_all.json');
     const allData = JSON.parse(fs.readFileSync(allSpellDataFile, { encoding: 'utf8' }));
     const data = allData.data[spellId];
     this.setCache(version, data, spellId);

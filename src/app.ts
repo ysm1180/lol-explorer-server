@@ -8,6 +8,8 @@ import * as path from 'path';
 import { updateAllStaticData } from './crontab/ddragon-data';
 import { loadPatchFile } from './crontab/season';
 import { redisClient } from './db/redis';
+import { DDragonHelper } from './lib/demacia/data-dragon/ddragon-helper';
+import { registerStaticChamionList, registerStaticItemList, registerStaticSpellList } from './models/util/static';
 import * as router from './routes';
 
 const app = express();
@@ -68,10 +70,26 @@ redisClient.auth('XwUNb6ViW7knzlL2rEIZCOGybdJzEliQ', (err) => {
 });
 
 // Init
-if (process.env.NODE_ENV === 'development') {
-  loadPatchFile();
-  updateAllStaticData();
-}
+DDragonHelper.getLastestVersion()
+  .then((version) => {
+    return DDragonHelper.downloadStaticDataByVersion(version).then(() => {
+      return version;
+    });
+  })
+  .then((version) => {
+    return Promise.all([
+      DDragonHelper.getChampionNameList(version),
+      DDragonHelper.getItemList(version),
+      DDragonHelper.getSummonerSpellList(version),
+    ]);
+  })
+  .then(([champions, items, spells]) => {
+    return Promise.all([
+      registerStaticChamionList(champions),
+      registerStaticItemList(items),
+      registerStaticSpellList(spells),
+    ]);
+  });
 
 // Run Server
 var port = normalizePort(process.env.PORT || '3000');

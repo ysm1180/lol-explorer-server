@@ -4,20 +4,14 @@ import { ReadStrorage } from './storage';
 import { IChampionDataDragon } from '../types/champion';
 
 class ChampionReadStrorage extends ReadStrorage {
-  public get(version: string, championKey: number): IChampionDataDragon {
+  public get(dataFolderPath: string, version: string, championKey: number): IChampionDataDragon {
     const value = this.getCache(version, championKey.toString());
     if (value !== null) {
       return value;
     }
 
-    const championDataFile = path.join(
-      __dirname,
-      'data',
-      'champion',
-      version,
-      `${championKey}.json`
-    );
-    const data = JSON.parse(fs.readFileSync(championDataFile, { encoding: 'utf8' }));
+    const championDataFilePath = path.join(dataFolderPath, `champion-${championKey}.json`);
+    const data = JSON.parse(fs.readFileSync(championDataFilePath, { encoding: 'utf8' }));
     this.setCache(version, data, championKey.toString());
     return data;
   }

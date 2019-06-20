@@ -1,8 +1,6 @@
 import axios from 'axios';
 import * as console from 'console';
-import * as fs from 'fs';
-import * as path from 'path';
-import { DDragonHelper } from './demacia/data-dragon/ddragon-helper';
+import * as constants from '../constants';
 
 function parseToRateLimit(str: string): { [key: string]: number } {
   const result: { [key: string]: number } = {};
@@ -71,7 +69,7 @@ export function callLolApi<T>(url: string, params: Object = {}): Promise<T> {
       method: 'get',
       params: params,
       headers: {
-        'X-Riot-Token': LOL_API_KEY,
+        'X-Riot-Token': constants.LOL_API_KEY,
       },
     })
       .then((response) => {
@@ -163,40 +161,4 @@ export function callLolApi<T>(url: string, params: Object = {}): Promise<T> {
         }
       });
   });
-}
-
-export async function getLastVersion() {
-  let version = await redisGetAsync('LOL_LAST_VERSION');
-  if (!version) {
-    const res = await axios.get(DDragonHelper.URL_VERSION());
-    version = res.data[0];
-    redisClient.set('LOL_LAST_VERSION', version, 'EX', 43200);
-  }
-  return version;
-}
-
-export async function getLastSeason() {
-  let season = await redisGetAsync('LOL_LAST_SEASON_ID');
-  if (!season) {
-    try {
-      const dataFolderPath = path.resolve(__dirname, 'data');
-      const patchDataPath = path.resolve(dataFolderPath, 'patch.json');
-      const jsonData = JSON.parse(fs.readFileSync(patchDataPath, { encoding: 'utf8' }));
-      const patchData = jsonData.patches;
-
-      const utcNow = new Date(new Date().toUTCString()).getTime();
-      while (patchData.length) {
-        const last = patchData.pop();
-        if (last.start < utcNow) {
-          season = last.season;
-          break;
-        }
-      }
-
-      redisClient.set('LOL_LAST_SEASON_ID', season, 'EX', 43200);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-  return Number(season);
 }

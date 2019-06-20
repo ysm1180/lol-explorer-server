@@ -4,6 +4,7 @@ import * as lodash from 'lodash';
 import * as querystring from 'querystring';
 import * as util from 'util';
 import * as constants from '../constants';
+import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import * as models from '../lib/demacia/models';
 import * as lol from '../lib/lol';
 import Game from '../models/game';
@@ -23,8 +24,8 @@ router.get('/:name', function(req, res, next) {
         next(err);
       }
 
-      const lastSeason = await getLastSeason();
-      const version = await getLastVersion();
+      const lastSeason = await DDragonHelper.getLastestSeason();
+      const version = await DDragonHelper.getLastestVersion();
       if (!summoner) {
         const url = util.format(
           constants.LOL_API.GET_SUMMONER_BY_NAME,

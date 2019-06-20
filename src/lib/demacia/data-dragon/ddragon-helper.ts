@@ -1,4 +1,8 @@
+import axios from 'axios';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as util from 'util';
+import * as redis from '../../../db/redis';
 
 const DDRAGON_URL = {
   VERSION: 'https://ddragon.leagueoflegends.com/api/versions.json',
@@ -18,6 +22,14 @@ const DDRAGON_URL = {
 };
 
 export class DDragonHelper {
+  static get storageRoot() {
+    return path.join(__dirname, 'data');
+  }
+
+  static buildStoragePath(version: string): string {
+    return path.resolve(DDragonHelper.storageRoot, version);
+  }
+
   static URL_VERSION(): string {
     return DDRAGON_URL.VERSION;
   }
@@ -73,4 +85,169 @@ export class DDragonHelper {
   static URL_PATCH_DATA(): string {
     return DDRAGON_URL.PATCH;
   }
+
+  static downloadStaticDataByVersion(version: string) {
+    return downloadStaticDataFiles(version, DDragonHelper.buildStoragePath(version));
+  }
+
+  static async getLastestVersion(): Promise<string> {
+    let version = await redis.getAsync('LOL_LAST_VERSION');
+    if (!version) {
+      try {
+        const res = await axios.get(DDragonHelper.URL_VERSION());
+        version = res.data[0];
+        redis.redisClient.set('LOL_LAST_VERSION', version, 'EX', 60 * 60 * 4);
+      } catch (err) {
+        console.error(err);
+        return '0';
+      }
+    }
+
+    return version;
+  }
+
+  static async getLastestSeason(): Promise<number> {
+    let season = await redis.getAsync('LOL_LAST_SEASON_ID');
+    if (!season) {
+      try {
+        const version = await DDragonHelper.getLastestVersion();
+        const patchDataPath = path.join(
+          DDragonHelper.buildStoragePath(version),
+          'patch',
+          'patch.json'
+        );
+        const jsonData = JSON.parse(fs.readFileSync(patchDataPath, { encoding: 'utf8' }));
+        const patchData = jsonData.patches;
+
+        const utcNow = new Date(new Date().toUTCString()).getTime();
+        while (patchData.length) {
+          const last = patchData.pop();
+          if (last.start < utcNow) {
+            season = last.season;
+            break;
+          }
+        }
+
+        redis.redisClient.set('LOL_LAST_SEASON_ID', season, 'EX', 43200);
+      } catch (err) {
+        console.error(err);
+        return 0;
+      }
+    }
+
+    return Number(season);
+  }
+
+  static getChampionNameList(version: string) {
+    return getStaticData(version, 'champion_all').then((data) => {
+      let result: { [id: string]: string } = {};
+      for (const key in data.data) {
+        const value = data.data[key];
+        result[value.key] = key;
+      }
+
+      return result;
+    });
+  }
+
+  static getItemList(version: string) {
+    return getStaticData(version, 'item_all');
+  }
+
+  static getSummonerSpellList(version: string) {
+    return getStaticData(version, 'spell_all');
+  }
+
+  static getPerkList(version: string) {
+    return getStaticData(version, 'perk_all');
+  }
+}
+
+function getStaticData(version: string, type: string) {
+  return DDragonHelper.downloadStaticDataByVersion(version).then(() => {
+    const filePath = path.join(DDragonHelper.buildStoragePath(version), `${type}.json`);
+    const content = fs.readFileSync(filePath, { encoding: 'utf8' });
+    return JSON.parse(content).data;
+  });
+}
+
+function downloadStaticDataFiles(version: string, dest: string) {
+  const infos: {
+    downloadUrl: string;
+    downloadFileName: string;
+    callback?: (downloadPath: string, data: any, done: () => void) => void;
+  }[] = [
+    {
+      downloadFileName: 'champion_all.json',
+      downloadUrl: DDragonHelper.URL_STATIC_CHAMPIONS_DATA(version),
+      callback: async (downloadPath, data, done) => {
+        for (const key in data.data) {
+          const value = data.data[key];
+          const championDataPath = path.resolve(
+            downloadPath,
+            `champion-${value.key.toString()}.json`
+          );
+          if (!fs.existsSync(championDataPath)) {
+            const url = DDragonHelper.URL_STATIC_CHAMPION_DATA(version, key);
+            try {
+              const response = await axios.get(url);
+              fs.writeFileSync(championDataPath, JSON.stringify(response.data));
+            } catch (error) {
+              console.log(error);
+            }
+            console.log(`[${championDataPath}] Written.`);
+          }
+        }
+
+        done();
+      },
+    },
+    {
+      downloadFileName: 'item_all.json',
+      downloadUrl: DDragonHelper.URL_STATIC_ITEMS_DATA(version),
+    },
+    {
+      downloadFileName: 'spell_all.json',
+      downloadUrl: DDragonHelper.URL_STATIC_SPELLS_DATA(version),
+    },
+    {
+      downloadFileName: 'perk_all.json',
+      downloadUrl: DDragonHelper.URL_STATIC_PERKS_DATA(version),
+    },
+    {
+      downloadFileName: 'patch.json',
+      downloadUrl: DDragonHelper.URL_PATCH_DATA(),
+    },
+  ];
+
+  const downloadPromises = infos.map((info) => {
+    const downloadFilePath = path.resolve(dest, info.downloadFileName);
+    const downloadFolderPath = path.dirname(downloadFilePath);
+    return new Promise((resolve, reject) => {
+      if (!fs.existsSync(downloadFolderPath)) {
+        fs.mkdirSync(downloadFolderPath, { recursive: true });
+      }
+
+      if (!fs.existsSync(downloadFilePath)) {
+        try {
+          axios.get(info.downloadUrl).then((response) => {
+            fs.writeFileSync(downloadFilePath, JSON.stringify(response.data));
+            console.log(`[${info.downloadFileName}] Written.`);
+
+            if (info.callback) {
+              info.callback(downloadFolderPath, response.data, resolve);
+            } else {
+              resolve();
+            }
+          });
+        } catch (error) {
+          reject(error);
+        }
+      } else {
+        resolve();
+      }
+    });
+  });
+
+  return Promise.all(downloadPromises);
 }

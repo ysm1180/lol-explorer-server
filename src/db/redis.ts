@@ -12,4 +12,4 @@ redisClient.on('connect', () => {
   console.log('Connected to redis server');
 });
 
-export const redisGetAsync = promisify(redisClient.get).bind(redisClient);
+export const getAsync = promisify(redisClient.get).bind(redisClient);

@@ -1,7 +1,7 @@
 import { Document, model, Schema } from 'mongoose';
-import { ILeagueApiData } from '../lib/demacia/models';
+import * as models from '../lib/demacia/models';
 
-export interface ILeagueModel extends ILeagueApiData, Document {}
+export interface ILeagueModel extends models.ILeagueApiData, Document {}
 
 var leagueSchema = new Schema({
   leagueId: String,

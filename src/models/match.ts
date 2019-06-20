@@ -1,7 +1,7 @@
 import { Document, model, Schema } from 'mongoose';
-import { IMatchApiData } from '../lib/demacia/models';
+import * as models from '../lib/demacia/models';
 
-export interface IMatchModel extends IMatchApiData, Document {}
+export interface IMatchModel extends models.IMatchApiData, Document {}
 
 var matchSchema = new Schema({
   summonerAccountId: String,

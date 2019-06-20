@@ -1,17 +1,17 @@
 import * as console from 'console';
-import { Router } from 'express';
+import * as express from 'express';
 import * as lodash from 'lodash';
-import { escape } from 'querystring';
-import { format } from 'util';
-import { LOL_API, LOL_URL } from '../constants';
-import { IGameApiData, IMatchApiData, ISummonerApiData } from '../lib/demacia/models';
-import { callLolApi, getLastSeason, getLastVersion, IAjaxGet, sequentialCallLolApis } from '../lib/lol';
+import * as querystring from 'querystring';
+import * as util from 'util';
+import * as constants from '../constants';
+import * as models from '../lib/demacia/models';
+import * as lol from '../lib/lol';
 import Game from '../models/game';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
-import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
+import * as league from '../models/util/league';
 
-const router = Router();
+const router = express.Router();
 
 router.get('/:name', function(req, res, next) {
   Summoner.findOne(
@@ -26,8 +26,12 @@ router.get('/:name', function(req, res, next) {
       const lastSeason = await getLastSeason();
       const version = await getLastVersion();
       if (!summoner) {
-        const url = format(LOL_API.GET_SUMMONER_BY_NAME, escape(req.params.name));
-        callLolApi<ISummonerApiData>(url)
+        const url = util.format(
+          constants.LOL_API.GET_SUMMONER_BY_NAME,
+          querystring.escape(req.params.name)
+        );
+        lol
+          .callLolApi<models.ISummonerApiData>(url)
           .then(async (summonerData) => {
             try {
               const summoners = await Summoner.find({ id: summonerData.id }).limit(1);
@@ -42,18 +46,20 @@ router.get('/:name', function(req, res, next) {
               throw new Error(err);
             }
 
-            return getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
+            return league.getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
               if (summoner) {
                 return { ...summoner.toObject(), seasons };
               }
             });
           })
           .then(async (summonerData) => {
-            const matchListUrl = format(
-              LOL_API.GET_MATCH_LIST_BY_ACCOUNT_ID,
-              escape(summonerData.accountId)
+            const matchListUrl = util.format(
+              constants.LOL_API.GET_MATCH_LIST_BY_ACCOUNT_ID,
+              querystring.escape(summonerData.accountId)
             );
-            const matchData = await callLolApi<{ matches: IMatchApiData[] }>(matchListUrl);
+            const matchData = await lol.callLolApi<{ matches: models.IMatchApiData[] }>(
+              matchListUrl
+            );
             const matchList = matchData.matches;
             for (var i = 0; i < matchList.length; i++) {
               matchList[i].summonerAccountId = summonerData.accountId;
@@ -72,7 +78,7 @@ router.get('/:name', function(req, res, next) {
             res.status(err.response.status).json({ error: err.response.data });
           });
       } else {
-        getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
+        league.getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
           if (summoner) {
             res.json({
               ...summoner.toObject(),
@@ -106,9 +112,12 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
     .then(async (items) => {
       let matchList = items.map((item) => item.toObject());
       if (items.length === 0) {
-        const url = format(LOL_API.GET_MATCH_LIST_BY_ACCOUNT_ID, escape(req.params.accountId));
+        const url = util.format(
+          constants.LOL_API.GET_MATCH_LIST_BY_ACCOUNT_ID,
+          querystring.escape(req.params.accountId)
+        );
         try {
-          const data = await callLolApi<{ matches: IMatchApiData[] }>(url);
+          const data = await lol.callLolApi<{ matches: models.IMatchApiData[] }>(url);
           let matchListData = data.matches;
           for (var i = 0; i < matchListData.length; i++) {
             matchListData[i].summonerAccountId = req.params.accountId;
@@ -129,12 +138,12 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
         const promises = [];
         for (let i = 0; i < matchList.length; i++) {
           const gameId = matchList[i].gameId;
-          const getGameApiCallingInfo = (): Promise<IAjaxGet<IGameApiData>> => {
+          const getGameApiCallingInfo = (): Promise<lol.IAjaxGet<models.IGameApiData>> => {
             return Game.find({ gameId: Number(gameId) })
               .limit(1)
               .then((games) => {
                 if (games.length === 0) {
-                  const url = format(LOL_API.GET_MATCH_INFO_BY_GAME_ID, gameId);
+                  const url = util.format(constants.LOL_API.GET_MATCH_INFO_BY_GAME_ID, gameId);
                   return {
                     url,
                   };
@@ -152,8 +161,8 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
 
         Promise.all(promises)
           .then((ajaxDataList) => {
-            const itemsOfArray: IAjaxGet<IGameApiData>[][] = [];
-            let items: IAjaxGet<IGameApiData>[] = [];
+            const itemsOfArray: lol.IAjaxGet<models.IGameApiData>[][] = [];
+            let items: lol.IAjaxGet<models.IGameApiData>[] = [];
             let count = 0;
             ajaxDataList.forEach((ajaxData) => {
               items.push(ajaxData);
@@ -167,9 +176,9 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
               }
             });
 
-            return sequentialCallLolApis(itemsOfArray);
+            return lol.sequentialCallLolApis(itemsOfArray);
           })
-          .then(async (games: { save: boolean; data: IGameApiData }[]) => {
+          .then(async (games: { save: boolean; data: models.IGameApiData }[]) => {
             games.forEach((game) => {
               if (game.save) {
                 new Game(game.data).save();

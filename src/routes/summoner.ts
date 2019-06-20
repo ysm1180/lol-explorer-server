@@ -9,7 +9,7 @@ import { callLolApi, getLastSeason, getLastVersion, IAjaxGet, sequentialCallLolA
 import Game from '../models/game';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
-import { getOrCreateLeagueData } from '../models/util/league';
+import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 
 const router = Router();
 
@@ -65,7 +65,7 @@ router.get('/:name', function(req, res, next) {
           .then((summonerData) => {
             res.json({
               ...summonerData,
-              iconUrl: format(LOL_URL.PROFILE_ICON, version, summonerData.profileIconId),
+              iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summonerData.profileIconId),
             });
           })
           .catch((err) => {
@@ -77,7 +77,7 @@ router.get('/:name', function(req, res, next) {
             res.json({
               ...summoner.toObject(),
               seasons,
-              iconUrl: format(LOL_URL.PROFILE_ICON, version, summoner.profileIconId),
+              iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
             });
           } else {
             res.status(404).json({ message: 'Summoner is not found.' });

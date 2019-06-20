@@ -2,12 +2,11 @@ import axios from 'axios';
 import * as console from 'console';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as util from 'util';
-import { LOL_URL } from '../constants';
 import { getLastVersion } from '../lib/lol';
 import Champion from '../models/static/champion';
 import Spell from '../models/static/spell';
 import Item from '../models/static/item';
+import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 
 export async function updateChampionData() {
   const version = await getLastVersion();
@@ -25,7 +24,7 @@ export async function updateChampionData() {
   }
 
   if (!fs.existsSync(allChampionData)) {
-    const url = util.format(LOL_URL.STATIC_CHAMPION_ALL_DATA, version);
+    const url = DDragonHelper.URL_STATIC_CHAMPIONS_DATA(version);
     try {
       console.log(`[Champion] Getting ${url} data...`);
       const response = await axios.get(url);
@@ -50,7 +49,7 @@ export async function updateChampionData() {
 
     const championDataPath = path.resolve(versionDataPath, String(value.key) + '.json');
     if (!fs.existsSync(championDataPath)) {
-      const url = util.format(LOL_URL.STATIC_CHAMPION_DATA, version, key);
+      const url = DDragonHelper.URL_STATIC_CHAMPION_DATA(version, key);
       try {
         console.log(`[Champion] Getting ${key} champion data ${url}`);
         const response = await axios.get(url);
@@ -80,7 +79,7 @@ export async function updateSpellData() {
   }
 
   if (!fs.existsSync(allSpellData)) {
-    const url = util.format(LOL_URL.STATIC_SPELL_ALL_DATA, version);
+    const url = DDragonHelper.URL_STATIC_SPELLS_DATA(version);
     try {
       console.log(`[Spell] Getting ${url} data...`);
       const response = await axios.get(url);
@@ -122,7 +121,7 @@ export async function updateItemData() {
   }
 
   if (!fs.existsSync(allItemData)) {
-    const url = util.format(LOL_URL.STATIC_ITEM_ALL_DATA, version);
+    const url = DDragonHelper.URL_STATIC_ITEMS_DATA(version);
     try {
       console.log(`[Item] Getting ${url} data...`);
       const response = await axios.get(url);
@@ -163,7 +162,7 @@ export async function updatePerkData() {
   }
 
   if (!fs.existsSync(allPerkData)) {
-    const url = util.format(LOL_URL.STATIC_PERK_ALL_DATA, version);
+    const url = DDragonHelper.URL_STATIC_PERKS_DATA(version);
     try {
       console.log(`[Perk] Getting ${url} data...`);
       const response = await axios.get(url);

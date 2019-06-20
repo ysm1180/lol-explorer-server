@@ -2,8 +2,7 @@ import axios from 'axios';
 import * as console from 'console';
 import * as fs from 'fs';
 import * as path from 'path';
-import { LOL_API_KEY, LOL_URL } from '../constants';
-import { redisClient, redisGetAsync } from '../db/redis';
+import { DDragonHelper } from './demacia/data-dragon/ddragon-helper';
 
 function parseToRateLimit(str: string): { [key: string]: number } {
   const result: { [key: string]: number } = {};
@@ -169,7 +168,7 @@ export function callLolApi<T>(url: string, params: Object = {}): Promise<T> {
 export async function getLastVersion() {
   let version = await redisGetAsync('LOL_LAST_VERSION');
   if (!version) {
-    const res = await axios.get(LOL_URL.VERSION);
+    const res = await axios.get(DDragonHelper.URL_VERSION());
     version = res.data[0];
     redisClient.set('LOL_LAST_VERSION', version, 'EX', 43200);
   }

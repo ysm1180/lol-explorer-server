@@ -1,7 +1,5 @@
 import { Router } from 'express';
 import * as lodash from 'lodash';
-import { format } from 'util';
-import { LOL_URL } from '../constants';
 import championStorage from '../lib/demacia/data-dragon/storage/champion-storage';
 import spellStorage from '../lib/demacia/data-dragon/storage/spell-storage';
 import { getLastVersion } from '../lib/lol';
@@ -10,6 +8,7 @@ import Spell from '../models/static/spell';
 import Item from '../models/static/item';
 import itemStorage from '../lib/demacia/data-dragon/storage/item-storage';
 import perkStorage from '../lib/demacia/data-dragon/storage/perk-storage';
+import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 
 const router = Router();
 
@@ -22,14 +21,14 @@ router.get('/champion/all', function(req, res, next) {
       const clientData = <any>lodash.cloneDeep(rawData);
 
       clientData.key = Number(clientData.key);
-      clientData.iconUrl = format(LOL_URL.CHAMPION_ICON, version, rawData.image.full);
-      clientData.passive.iconUrl = format(
-        LOL_URL.CHAMPION_PASSIVE_ICON,
+      clientData.iconUrl = DDragonHelper.URL_CHAMPION_ICON(version, rawData.image.full);
+      clientData.passive.iconUrl = DDragonHelper.URL_CHAMPION_PASSIVE_ICON(
         version,
         rawData.passive.image.full
       );
+
       clientData.spells = clientData.spells.map((spell: any) => {
-        spell.iconUrl = format(LOL_URL.CHAMPION_SPELL_ICON, version, spell.image.full);
+        spell.iconUrl = DDragonHelper.URL_CHAMPION_SPELL_ICON(version, spell.image.full);
 
         delete spell.image;
         delete spell.effect;
@@ -56,7 +55,7 @@ router.get('/spell/all', function(req, res, next) {
       const clientData = <any>lodash.cloneDeep(rawData);
 
       clientData.key = Number(clientData.key);
-      clientData.iconUrl = format(LOL_URL.SPELL_ICON, version, rawData.image.full);
+      clientData.iconUrl = DDragonHelper.URL_SPELL_ICON(version, rawData.image.full);
       delete clientData.image;
       delete clientData.effect;
       delete clientData.effectBurn;
@@ -76,7 +75,7 @@ router.get('/item/all', function(req, res, next) {
       const clientData = <any>lodash.cloneDeep(rawData);
 
       clientData.key = item.key;
-      clientData.iconUrl = format(LOL_URL.ITEM_ICON, version, rawData.image.full);
+      clientData.iconUrl = DDragonHelper.URL_ITEM_ICON(version, rawData.image.full);
       delete clientData.image;
       delete clientData.effect;
       delete clientData.maps;
@@ -98,7 +97,7 @@ router.get('/item/all', function(req, res, next) {
       const clientData = <any>lodash.cloneDeep(rawData);
 
       clientData.key = item.key;
-      clientData.iconUrl = format(LOL_URL.ITEM_ICON, version, rawData.image.full);
+      clientData.iconUrl = DDragonHelper.URL_ITEM_ICON(version, rawData.image.full);
       delete clientData.image;
       delete clientData.effect;
       delete clientData.maps;
@@ -117,7 +116,7 @@ router.get('/perk/all', function(req, res, next) {
     const rawData = perkStorage.get(version);
     const clientData = <any[]>lodash.cloneDeep(rawData);
     for (let i = 0; i < clientData.length; i++) {
-      clientData[i].baseIconUrl = LOL_URL.BASE_PERK_ICON_URL;
+      clientData[i].baseIconUrl = DDragonHelper.URL_PERK_ICON(version);
     }
     res.json(clientData);
   });

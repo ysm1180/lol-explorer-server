@@ -84,9 +84,8 @@ typings/
 .dynamodb/
 
 # Project
-build/
+dist/
 *.http
-data/
 
 # awcache
 .awcache

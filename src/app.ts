@@ -2,11 +2,9 @@ import * as console from 'console';
 import * as cookieParser from 'cookie-parser';
 import * as express from 'express';
 import * as createError from 'http-errors';
-import { connect, connection } from 'mongoose';
 import * as logger from 'morgan';
 import * as path from 'path';
-import { updateAllStaticData } from './crontab/ddragon-data';
-import { loadPatchFile } from './crontab/season';
+import mongo from './db/mongo';
 import { redisClient } from './db/redis';
 import { DDragonHelper } from './lib/demacia/data-dragon/ddragon-helper';
 import { registerStaticChamionList, registerStaticItemList, registerStaticSpellList } from './models/util/static';
@@ -43,24 +41,14 @@ app.use(function(
   });
 });
 
-const db = connection;
-db.on('error', console.error);
-db.once('open', () => {
+// Mongo
+mongo.on('error', (_, ...args) => {
+  console.error(...args);
+});
+mongo.once('open', () => {
   console.log('Connected to mongod server');
 });
-
-const USER = 'ysm1180';
-const PASSWORD = 'jesntaids0811';
-const HOST = 'localhost';
-const PORT = 27017;
-const DATABASE = 'lol-explorer';
-
-connect(
-  `mongodb://${USER}:${PASSWORD}@${HOST}:${PORT}/${DATABASE}?retryWrites=true`,
-  {
-    useNewUrlParser: true,
-  }
-);
+mongo.connect();
 
 // Redis
 redisClient.auth('XwUNb6ViW7knzlL2rEIZCOGybdJzEliQ', (err) => {
@@ -108,3 +96,5 @@ function normalizePort(val: string) {
 
   return false;
 }
+
+export default app;

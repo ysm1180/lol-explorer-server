@@ -1,19 +1,21 @@
 import * as mongoose from 'mongoose';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 interface MongoDBOptions {
-  user: string;
-  password: string;
-  host: string;
-  port: number;
-  database: string;
+  user?: string;
+  password?: string;
+  host?: string;
+  port?: number;
+  database?: string;
 }
 
 const databaseInfo: MongoDBOptions = {
-  user: 'ysm1180',
-  password: 'jesntaids0811',
-  host: 'localhost',
-  port: 27017,
-  database: 'lol-explorer',
+  user: process.env.MONGO_USER,
+  password: process.env.MONGO_PASSWORD,
+  host: process.env.MONGO_HOST,
+  port: Number(process.env.MONGO_PORT),
+  database: process.env.MONGO_DATABASE,
 };
 
 export class MongoDB {

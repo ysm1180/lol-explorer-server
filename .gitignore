@@ -89,3 +89,6 @@ dist/
 
 # awcache
 .awcache
+
+# dotenv
+.env

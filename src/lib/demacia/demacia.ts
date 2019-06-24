@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { ISummonerApiData, IMatchApiData, ILeagueApiData, IGameApiData } from './models';
+import { IGameApiData, ILeagueApiData, IMatchApiData, ISummonerApiData } from './models';
+import { SummonerUtil } from './util/summoner-util';
 
 export class Demacia {
   private apiUrl: string;
@@ -19,6 +20,7 @@ export class Demacia {
   }
 
   public getSummonerByName(name: string) {
+    name = SummonerUtil.normalizeSummonerName(name);
     return this.callLolApi<ISummonerApiData>(
       `${this.apiUrl}/summoner/v4/summoners/by-name/${encodeURIComponent(name)}`
     );

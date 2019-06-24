@@ -220,7 +220,7 @@ describe('Summoner rest api test suite', () => {
 
             done();
           });
-      });
+      }).timeout(20000);
 
       it('should get summoner info when summoner data exists in database', (done) => {
         ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
@@ -282,6 +282,7 @@ describe('Summoner rest api test suite', () => {
           .expects('find')
           .withArgs({ id: summonerMock.id })
           .chain('limit')
+          .withArgs(1)
           .returns(
             Promise.resolve([
               new Summoner({
@@ -478,7 +479,7 @@ describe('Summoner rest api test suite', () => {
 
             done();
           });
-      });
+      }).timeout(20000);
 
       it('should get match info list when match list exists in database', (done) => {
         const matchListMock = TestUtil.mocks.matches;

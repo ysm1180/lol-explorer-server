@@ -101,7 +101,7 @@ export class DDragonHelper {
     return downloadStaticDataFiles(version, DDragonHelper.buildStoragePath(version));
   }
 
-  static async getLastestVersion(): Promise<string> {
+  static async getLatestVersion(): Promise<string> {
     let version = await redis.get('LOL_LAST_VERSION');
     if (!version) {
       try {
@@ -120,7 +120,7 @@ export class DDragonHelper {
     let season = await redis.get('LOL_LAST_SEASON_ID');
     if (!season) {
       try {
-        const version = await DDragonHelper.getLastestVersion();
+        const version = await DDragonHelper.getLatestVersion();
         const patchDataPath = path.join(DDragonHelper.buildStoragePath(version), 'patch.json');
         const jsonData = JSON.parse(fs.readFileSync(patchDataPath, { encoding: 'utf8' }));
         const patchData = jsonData.patches;

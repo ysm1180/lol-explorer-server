@@ -62,7 +62,7 @@ if (process.env.NODE_ENV !== 'test') {
   });
   mongo.connect();
 
-  DDragonHelper.getLastestVersion()
+  DDragonHelper.getLatestVersion()
     .then((version) => {
       return DDragonHelper.downloadStaticDataByVersion(version).then(() => {
         return version;

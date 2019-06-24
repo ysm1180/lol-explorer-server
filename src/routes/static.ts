@@ -9,7 +9,7 @@ const router = Router();
 
 router.get('/champion/all', function(req, res, next) {
   Champion.find().then(async (champions) => {
-    const version = await DDragonHelper.getLastestVersion();
+    const version = await DDragonHelper.getLatestVersion();
     const promises = [];
     for (let i = 0; i < champions.length; i++) {
       const promise = DDragonHelper.getChampionData(
@@ -58,7 +58,7 @@ router.get('/champion/all', function(req, res, next) {
 
 router.get('/spell/all', function(req, res, next) {
   Spell.find().then(async (spells) => {
-    const version = await DDragonHelper.getLastestVersion();
+    const version = await DDragonHelper.getLatestVersion();
     const promises = [];
     for (let i = 0; i < spells.length; i++) {
       const promise = DDragonHelper.getSummonerSpellData(version, spells[i].id).then((rawData) => {
@@ -89,7 +89,7 @@ router.get('/spell/all', function(req, res, next) {
 
 router.get('/item/all', function(req, res, next) {
   Item.find().then(async (items) => {
-    const version = await DDragonHelper.getLastestVersion();
+    const version = await DDragonHelper.getLatestVersion();
     const promises = [];
     for (let i = 0; i < items.length; i++) {
       const promise = DDragonHelper.getItemData(version, items[i].key).then((rawData) => {
@@ -121,7 +121,7 @@ router.get('/item/all', function(req, res, next) {
 });
 
 router.get('/perk/all', function(req, res, next) {
-  DDragonHelper.getLastestVersion().then(async (version) => {
+  DDragonHelper.getLatestVersion().then(async (version) => {
     const rawData = await DDragonHelper.getPerkAllData(version);
     const clientData = <any[]>lodash.cloneDeep(rawData);
     for (let i = 0; i < clientData.length; i++) {

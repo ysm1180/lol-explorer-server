@@ -2,7 +2,7 @@ import * as mongoose from 'mongoose';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-interface MongoDBOptions {
+interface IMongoDBOptions {
   user?: string;
   password?: string;
   host?: string;
@@ -10,19 +10,11 @@ interface MongoDBOptions {
   database?: string;
 }
 
-const databaseInfo: MongoDBOptions = {
-  user: process.env.MONGO_USER,
-  password: process.env.MONGO_PASSWORD,
-  host: process.env.MONGO_HOST,
-  port: Number(process.env.MONGO_PORT),
-  database: process.env.MONGO_DATABASE,
-};
-
 export class MongoDB {
   private url: string;
   private db = mongoose.connection;
 
-  constructor(options: MongoDBOptions) {
+  constructor(options: IMongoDBOptions) {
     const { user, password, host, port, database } = options;
     this.url = `mongodb://${user}:${password}@${host}:${port}/${database}?retryWrites=true`;
   }
@@ -45,5 +37,13 @@ export class MongoDB {
     });
   }
 }
+
+const databaseInfo: IMongoDBOptions = {
+  user: process.env.MONGO_USER,
+  password: process.env.MONGO_PASSWORD,
+  host: process.env.MONGO_HOST,
+  port: Number(process.env.MONGO_PORT),
+  database: process.env.MONGO_DATABASE,
+};
 
 export default new MongoDB(databaseInfo);

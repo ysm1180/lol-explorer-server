@@ -1,9 +1,9 @@
-export abstract class ReadStrorage {
+export class CacheStorage {
   private cacheData: { [key: string]: { [subKey: string]: any } } = {};
 
   constructor() {}
 
-  protected getCache(key: string, subKey?: string): any {
+  public get(key: string, subKey?: string): any {
     if (this.cacheData[key] !== undefined) {
       if (subKey) {
         if (this.cacheData[key][subKey] !== undefined) {
@@ -17,7 +17,7 @@ export abstract class ReadStrorage {
     return null;
   }
 
-  protected setCache(key: string, value: any, subKey?: string): void {
+  public set(key: string, value: any, subKey?: string): void {
     if (subKey) {
       if (this.cacheData[key] !== undefined) {
         this.cacheData[key][subKey] = value;

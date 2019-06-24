@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
 import redis from '../../../db/redis';
+import { CacheStorage } from './storage';
 
 const DDRAGON_URL = {
   VERSION: 'https://ddragon.leagueoflegends.com/api/versions.json',
@@ -23,6 +24,11 @@ const DDRAGON_URL = {
 
 let storageRoot = path.join(__dirname, 'data');
 export class DDragonHelper {
+  private static staticChampionDataCache = new CacheStorage();
+  private static staticItemDataCache = new CacheStorage();
+  private static staticSpellDataCache = new CacheStorage();
+  private static staticPerkDataCache = new CacheStorage();
+
   static get storageRoot() {
     return storageRoot;
   }
@@ -103,8 +109,7 @@ export class DDragonHelper {
         version = res.data[0];
         redis.set('LOL_LAST_VERSION', version, 60 * 60 * 4);
       } catch (err) {
-        console.error(err);
-        return '0';
+        return Promise.reject(err);
       }
     }
 
@@ -128,60 +133,154 @@ export class DDragonHelper {
             break;
           }
         }
-
         redis.set('LOL_LAST_SEASON_ID', season, 43200);
       } catch (err) {
-        console.error(err);
-        return 0;
+        return Promise.reject(err);
       }
     }
 
     return Number(season);
   }
 
-  static getChampionNameList(version: string) {
-    return getStaticData(version, 'champion_all').then((data) => {
-      let result: { [id: string]: string } = {};
-      for (const key in data.data) {
-        const value = data.data[key];
-        result[value.key] = key;
-      }
+  static getChampionData(version: string, championKey: number, championId: string) {
+    const key = championKey.toString();
+    const value = DDragonHelper.staticChampionDataCache.get(version, key);
+    if (value) {
+      return Promise.resolve(value);
+    } else {
+      return getStaticData(version, `champion-${championKey}`)
+        .then((champion) => {
+          champion = champion.data[championId];
+          DDragonHelper.staticChampionDataCache.set(version, champion, key);
+          return champion;
+        })
+        .catch((err) => {
+          return Promise.reject(err);
+        });
+    }
+  }
 
-      return result;
-    });
+  static getChampionNameList(version: string) {
+    return getStaticData(version, 'champion_all')
+      .then((data) => {
+        let result: { [id: string]: string } = {};
+        for (const key in data.data) {
+          const value = data.data[key];
+          result[value.key] = key;
+        }
+
+        return result;
+      })
+      .catch((err) => {
+        return Promise.reject(err);
+      });
   }
 
   static getItemList(version: string) {
-    return getStaticData(version, 'item_all');
+    return getStaticData(version, 'item_all')
+      .then((data) => {
+        return data.data;
+      })
+      .catch((err) => {
+        return Promise.reject(err);
+      });
+  }
+
+  static getItemData(version: string, itemKey: number) {
+    const key = itemKey.toString();
+    const value = DDragonHelper.staticItemDataCache.get(version, key);
+    if (value) {
+      return Promise.resolve(value);
+    } else {
+      return getStaticData(version, 'item_all')
+        .then((items) => {
+          items = items.data;
+          DDragonHelper.staticItemDataCache.set(version, items[key], key);
+          return items[key];
+        })
+        .catch((err) => {
+          return Promise.reject(err);
+        });
+    }
   }
 
   static getSummonerSpellList(version: string) {
-    return getStaticData(version, 'spell_all');
+    return getStaticData(version, 'spell_all')
+      .then((spells) => {
+        return spells.data;
+      })
+      .catch((err) => {
+        return Promise.reject(err);
+      });
   }
 
-  static getPerkList(version: string) {
-    return getStaticData(version, 'perk_all');
+  static getSummonerSpellData(version: string, spellId: string) {
+    const value = DDragonHelper.staticSpellDataCache.get(version, spellId);
+    if (value) {
+      return Promise.resolve(value);
+    } else {
+      return getStaticData(version, 'spell_all')
+        .then((spells) => {
+          spells = spells.data;
+          DDragonHelper.staticSpellDataCache.set(version, spells[spellId], spellId);
+          return spells[spellId];
+        })
+        .catch((err) => {
+          return Promise.reject(err);
+        });
+    }
+  }
+
+  static getPerkAllData(version: string) {
+    const value = DDragonHelper.staticPerkDataCache.get(version);
+    if (value) {
+      return Promise.resolve(value);
+    } else {
+      return getStaticData(version, 'perk_all')
+        .then((data) => {
+          DDragonHelper.staticPerkDataCache.set(version, data);
+          return data;
+        })
+        .catch((err) => {
+          return Promise.reject(err);
+        });
+    }
   }
 }
 
 function getStaticData(version: string, type: string) {
-  return DDragonHelper.downloadStaticDataByVersion(version).then(() => {
-    const filePath = path.join(DDragonHelper.buildStoragePath(version), `${type}.json`);
-    const content = fs.readFileSync(filePath, { encoding: 'utf8' });
-    return JSON.parse(content).data;
-  });
+  return DDragonHelper.downloadStaticDataByVersion(version)
+    .then(() => {
+      const filePath = path.join(DDragonHelper.buildStoragePath(version), `${type}.json`);
+      let content = '';
+      try {
+        content = fs.readFileSync(filePath, { encoding: 'utf8' });
+      } catch (err) {
+        return Promise.reject(err);
+      }
+
+      return JSON.parse(content);
+    })
+    .catch((err) => {
+      return Promise.reject(err);
+    });
 }
 
 function downloadStaticDataFiles(version: string, dest: string) {
   const infos: {
     downloadUrl: string;
     downloadFileName: string;
-    callback?: (downloadPath: string, data: any, done: () => void) => void;
+    callback?: (
+      downloadPath: string,
+      data: any,
+      done: () => void,
+      fail: (err: any) => void
+    ) => void;
   }[] = [
     {
       downloadFileName: 'champion_all.json',
       downloadUrl: DDragonHelper.URL_STATIC_CHAMPIONS_DATA(version),
-      callback: async (downloadPath, data, done) => {
+      callback: async (downloadPath, data, done, fail) => {
         for (const key in data.data) {
           const value = data.data[key];
           const championDataPath = path.resolve(
@@ -193,10 +292,11 @@ function downloadStaticDataFiles(version: string, dest: string) {
             try {
               const response = await axios.get(url);
               fs.writeFileSync(championDataPath, JSON.stringify(response.data));
+              console.log(`[${championDataPath}] Written.`);
             } catch (error) {
-              console.log(error);
+              fail(error);
+              return;
             }
-            console.log(`[${championDataPath}] Written.`);
           }
         }
 
@@ -236,7 +336,7 @@ function downloadStaticDataFiles(version: string, dest: string) {
             console.log(`[${info.downloadFileName}] Written.`);
 
             if (info.callback) {
-              info.callback(downloadFolderPath, response.data, resolve);
+              info.callback(downloadFolderPath, response.data, resolve, reject);
             } else {
               resolve();
             }
@@ -245,7 +345,12 @@ function downloadStaticDataFiles(version: string, dest: string) {
           reject(error);
         }
       } else {
-        resolve();
+        const content = fs.readFileSync(downloadFilePath, { encoding: 'utf8' });
+        if (info.callback) {
+          info.callback(downloadFolderPath, JSON.parse(content).data, resolve, reject);
+        } else {
+          resolve();
+        }
       }
     });
   });

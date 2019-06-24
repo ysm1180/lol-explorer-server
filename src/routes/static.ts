@@ -7,117 +7,99 @@ import Spell from '../models/static/spell';
 
 const router = Router();
 
-router.get('/champion/all', function(req, res, next) {
-  Champion.find().then(async (champions) => {
+router.get('/champion/all', async function(req, res, next) {
+  try {
+    const result = [];
+    const champions = await Champion.find();
     const version = await DDragonHelper.getLatestVersion();
-    const promises = [];
     for (let i = 0; i < champions.length; i++) {
-      const promise = DDragonHelper.getChampionData(
+      const rawData = await DDragonHelper.getChampionData(
         version,
         champions[i].key,
         champions[i].id
-      ).then((rawData) => {
-        const clientData = <any>lodash.cloneDeep(rawData);
+      );
+      const clientData = <any>lodash.cloneDeep(rawData);
 
-        clientData.key = Number(clientData.key);
-        clientData.iconUrl = DDragonHelper.URL_CHAMPION_ICON(version, rawData.image.full);
-        clientData.passive.iconUrl = DDragonHelper.URL_CHAMPION_PASSIVE_ICON(
-          version,
-          rawData.passive.image.full
-        );
+      clientData.key = Number(clientData.key);
+      clientData.iconUrl = DDragonHelper.URL_CHAMPION_ICON(version, rawData.image.full);
+      clientData.passive.iconUrl = DDragonHelper.URL_CHAMPION_PASSIVE_ICON(
+        version,
+        rawData.passive.image.full
+      );
 
-        clientData.spells = clientData.spells.map((spell: any) => {
-          spell.iconUrl = DDragonHelper.URL_CHAMPION_SPELL_ICON(version, spell.image.full);
+      clientData.spells = clientData.spells.map((spell: any) => {
+        spell.iconUrl = DDragonHelper.URL_CHAMPION_SPELL_ICON(version, spell.image.full);
 
-          delete spell.image;
-          delete spell.effect;
-          delete spell.effectBurn;
+        delete spell.image;
+        delete spell.effect;
+        delete spell.effectBurn;
 
-          return spell;
-        });
-
-        delete clientData.passive.image;
-        delete clientData.image;
-        delete clientData.recommended;
-
-        return clientData;
+        return spell;
       });
 
-      promises.push(promise);
+      delete clientData.passive.image;
+      delete clientData.image;
+      delete clientData.recommended;
+
+      result.push(clientData);
     }
 
-    Promise.all(promises)
-      .then((dataList) => {
-        res.json(dataList);
-      })
-      .catch((err) => {
-        next(err);
-      });
-  });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/spell/all', function(req, res, next) {
-  Spell.find().then(async (spells) => {
+router.get('/spell/all', async function(req, res, next) {
+  try {
+    const result = [];
+    const spells = await Spell.find();
     const version = await DDragonHelper.getLatestVersion();
-    const promises = [];
     for (let i = 0; i < spells.length; i++) {
-      const promise = DDragonHelper.getSummonerSpellData(version, spells[i].id).then((rawData) => {
-        const clientData = <any>lodash.cloneDeep(rawData);
+      const rawData = await DDragonHelper.getSummonerSpellData(version, spells[i].id);
+      const clientData = <any>lodash.cloneDeep(rawData);
 
-        clientData.key = Number(clientData.key);
-        clientData.iconUrl = DDragonHelper.URL_SPELL_ICON(version, rawData.image.full);
-        delete clientData.image;
-        delete clientData.effect;
-        delete clientData.effectBurn;
-        delete clientData.modes;
+      clientData.key = Number(clientData.key);
+      clientData.iconUrl = DDragonHelper.URL_SPELL_ICON(version, rawData.image.full);
+      delete clientData.image;
+      delete clientData.effect;
+      delete clientData.effectBurn;
+      delete clientData.modes;
 
-        return clientData;
-      });
-
-      promises.push(promise);
+      result.push(clientData);
     }
 
-    Promise.all(promises)
-      .then((dataList) => {
-        res.json(dataList);
-      })
-      .catch((err) => {
-        next(err);
-      });
-  });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
 });
 
-router.get('/item/all', function(req, res, next) {
-  Item.find().then(async (items) => {
+router.get('/item/all', async function(req, res, next) {
+  try {
+    const result = [];
+    const items = await Item.find();
     const version = await DDragonHelper.getLatestVersion();
-    const promises = [];
     for (let i = 0; i < items.length; i++) {
-      const promise = DDragonHelper.getItemData(version, items[i].key).then((rawData) => {
-        const clientData = <any>lodash.cloneDeep(rawData);
+      const rawData = await DDragonHelper.getItemData(version, items[i].key);
+      const clientData = <any>lodash.cloneDeep(rawData);
 
-        clientData.key = items[i].key;
-        clientData.iconUrl = DDragonHelper.URL_ITEM_ICON(version, rawData.image.full);
-        delete clientData.image;
-        delete clientData.effect;
-        delete clientData.maps;
-        delete clientData.stats;
-        delete clientData.tags;
-        delete clientData.depth;
+      clientData.key = items[i].key;
+      clientData.iconUrl = DDragonHelper.URL_ITEM_ICON(version, rawData.image.full);
+      delete clientData.image;
+      delete clientData.effect;
+      delete clientData.maps;
+      delete clientData.stats;
+      delete clientData.tags;
+      delete clientData.depth;
 
-        return clientData;
-      });
-
-      promises.push(promise);
+      result.push(clientData);
     }
 
-    Promise.all(promises)
-      .then((dataList) => {
-        res.json(dataList);
-      })
-      .catch((err) => {
-        next(err);
-      });
-  });
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get('/perk/all', function(req, res, next) {

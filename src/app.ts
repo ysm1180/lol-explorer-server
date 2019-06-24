@@ -30,20 +30,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/summoner', router.summonerRouter);
 app.use('/static', router.staticRouter);
 
-app.use((req, res, next) => {
-  next(createError(404));
-});
 app.use(function(
   err: createError.HttpError,
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
 ) {
-  res.status(err.status || 500);
-  res.json({
-    message: err.message,
-    data: err.data,
-  });
+  if (err.response) {
+    res.status(err.response.status || 500).json({
+      message: err.response.statusText,
+      data: err.response.data,
+    });
+  } else {
+    res.status(err.status || 500).json({
+      message: err.message,
+      data: err.data,
+    });
+  }
 });
 
 if (process.env.NODE_ENV !== 'test') {

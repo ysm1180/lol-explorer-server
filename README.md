@@ -29,6 +29,11 @@ $ yarn init:mongo
 ## Redis
 You should fill redis connection options (host, port, pasword) in `.env` file.
 
+## TEST
+```shell
+$ yarn test
+```
+
 ## PRODUCTION
 ```shell
 $ yarn build:prod

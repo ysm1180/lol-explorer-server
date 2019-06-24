@@ -116,7 +116,7 @@ export class DDragonHelper {
     return version;
   }
 
-  static async getLastestSeason(): Promise<number> {
+  static async getLatestSeason(): Promise<number> {
     let season = await redis.get('LOL_LAST_SEASON_ID');
     if (!season) {
       try {

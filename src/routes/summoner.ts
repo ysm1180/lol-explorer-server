@@ -13,7 +13,7 @@ router.get('/:name', function(req, res, next) {
   Summoner.findOne({
     name: req.params.name,
   }).then(async (summoner) => {
-    const lastSeason = await DDragonHelper.getLastestSeason();
+    const lastSeason = await DDragonHelper.getLatestSeason();
     const version = await DDragonHelper.getLatestVersion();
     if (!summoner) {
       demacia

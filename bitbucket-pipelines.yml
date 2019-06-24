@@ -1,0 +1,14 @@
+image: node:10.15.3
+
+pipelines:
+  default:
+    - step:
+        caches:
+          - node
+        script:
+          - yarn install
+          - yarn test
+          - pipe: atlassian/slack-notify:0.3.0
+            variables:
+              WEBHOOK_URL: 'https://hooks.slack.com/services/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'
+              MESSAGE: '[lol-explorer-server] Complete test.'

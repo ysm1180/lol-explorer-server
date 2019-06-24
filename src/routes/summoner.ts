@@ -1,13 +1,8 @@
-import * as console from 'console';
 import * as express from 'express';
 import * as lodash from 'lodash';
-import * as querystring from 'querystring';
-import * as util from 'util';
-import * as constants from '../constants';
+import demacia from '../common/demacia';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
-import * as models from '../lib/demacia/models';
-import * as lol from '../lib/lol';
-import Game from '../models/game';
+import Game, { IGameModel } from '../models/game';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
 import * as league from '../models/util/league';
@@ -27,12 +22,8 @@ router.get('/:name', function(req, res, next) {
       const lastSeason = await DDragonHelper.getLastestSeason();
       const version = await DDragonHelper.getLastestVersion();
       if (!summoner) {
-        const url = util.format(
-          constants.LOL_API.GET_SUMMONER_BY_NAME,
-          querystring.escape(req.params.name)
-        );
-        lol
-          .callLolApi<models.ISummonerApiData>(url)
+        demacia
+          .getSummonerByName(req.params.name)
           .then(async (summonerData) => {
             try {
               const summoners = await Summoner.find({ id: summonerData.id }).limit(1);
@@ -54,13 +45,7 @@ router.get('/:name', function(req, res, next) {
             });
           })
           .then(async (summonerData) => {
-            const matchListUrl = util.format(
-              constants.LOL_API.GET_MATCH_LIST_BY_ACCOUNT_ID,
-              querystring.escape(summonerData.accountId)
-            );
-            const matchData = await lol.callLolApi<{ matches: models.IMatchApiData[] }>(
-              matchListUrl
-            );
+            const matchData = await demacia.getMatchListByAccountId(summonerData.accountId);
             const matchList = matchData.matches;
             for (var i = 0; i < matchList.length; i++) {
               matchList[i].summonerAccountId = summonerData.accountId;
@@ -80,15 +65,12 @@ router.get('/:name', function(req, res, next) {
           });
       } else {
         league.getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
-          if (summoner) {
+          summoner &&
             res.json({
               ...summoner.toObject(),
               seasons,
               iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
             });
-          } else {
-            res.status(404).json({ message: 'Summoner is not found.' });
-          }
         });
       }
     }
@@ -113,12 +95,8 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
     .then(async (items) => {
       let matchList = items.map((item) => item.toObject());
       if (items.length === 0) {
-        const url = util.format(
-          constants.LOL_API.GET_MATCH_LIST_BY_ACCOUNT_ID,
-          querystring.escape(req.params.accountId)
-        );
         try {
-          const data = await lol.callLolApi<{ matches: models.IMatchApiData[] }>(url);
+          const data = await demacia.getMatchListByAccountId(req.params.accountId);
           let matchListData = data.matches;
           for (var i = 0; i < matchListData.length; i++) {
             matchListData[i].summonerAccountId = req.params.accountId;
@@ -127,8 +105,6 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
           matchList = docs.ops;
           matchList = matchList.slice(start, start + count);
         } catch (err) {
-          console.log(`[callLolApi] ${url}`);
-          console.log(err.response);
           if (err.response.status === 404) {
             matchList = [];
           }
@@ -139,57 +115,34 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
         const promises = [];
         for (let i = 0; i < matchList.length; i++) {
           const gameId = matchList[i].gameId;
-          const getGameApiCallingInfo = (): Promise<lol.IAjaxGet<models.IGameApiData>> => {
+          const getGameApiCallingInfo = () => {
             return Game.find({ gameId: Number(gameId) })
               .limit(1)
-              .then((games) => {
+              .then(async (games) => {
                 if (games.length === 0) {
-                  const url = util.format(constants.LOL_API.GET_MATCH_INFO_BY_GAME_ID, gameId);
-                  return {
-                    url,
-                  };
+                  try {
+                    const data = await demacia.getMatchInfoByGameId(gameId);
+                    const game = new Game(data);
+                    game.save();
+                    return game;
+                  } catch (err) {
+                    return Promise.reject(err);
+                  }
                 } else {
-                  return {
-                    url: '',
-                    data: games[0],
-                  };
+                  return games[0];
                 }
               });
           };
 
-          promises.push(Promise.resolve(getGameApiCallingInfo()));
+          promises.push(getGameApiCallingInfo());
         }
 
         Promise.all(promises)
-          .then((ajaxDataList) => {
-            const itemsOfArray: lol.IAjaxGet<models.IGameApiData>[][] = [];
-            let items: lol.IAjaxGet<models.IGameApiData>[] = [];
-            let count = 0;
-            ajaxDataList.forEach((ajaxData) => {
-              items.push(ajaxData);
-              count++;
-
-              // TODO : 10 is random constant, but later adjust the value by app rate.
-              if (count === 10) {
-                itemsOfArray.push(items);
-                items = [];
-                count = 0;
-              }
-            });
-
-            return lol.sequentialCallLolApis(itemsOfArray);
-          })
-          .then(async (games: { save: boolean; data: models.IGameApiData }[]) => {
-            games.forEach((game) => {
-              if (game.save) {
-                new Game(game.data).save();
-              }
-            });
-
+          .then((games: IGameModel[]) => {
             const result: Object[] = [];
             matchList.forEach((match, idx) => {
               const data = { ...match };
-              const gameClientData = lodash.cloneDeep(games[idx].data);
+              const gameClientData = lodash.cloneDeep(games[idx]);
               gameClientData.participants.forEach((participant) => {
                 const { item0, item1, item2, item3, item4, item5, item6 } = participant.stats;
                 participant.stats.items = [item0, item1, item2, item3, item4, item5, item6];

@@ -10,78 +10,81 @@ import * as league from '../models/util/league';
 const router = express.Router();
 
 router.get('/:name', function(req, res, next) {
-  Summoner.findOne(
-    {
-      name: req.params.name,
-    },
-    async (err, summoner) => {
-      if (err) {
-        next(err);
-      }
-
-      const lastSeason = await DDragonHelper.getLastestSeason();
-      const version = await DDragonHelper.getLastestVersion();
-      if (!summoner) {
-        demacia
-          .getSummonerByName(req.params.name)
-          .then(async (summonerData) => {
-            try {
-              const summoners = await Summoner.find({ id: summonerData.id }).limit(1);
-              if (summoners.length === 0) {
-                summoner = new Summoner(summonerData);
-              } else {
-                summoner = summoners[0];
-                summoner.name = req.params.name;
-              }
-              summoner.save();
-            } catch (err) {
-              throw new Error(err);
+  Summoner.findOne({
+    name: req.params.name,
+  }).then(async (summoner) => {
+    const lastSeason = await DDragonHelper.getLastestSeason();
+    const version = await DDragonHelper.getLastestVersion();
+    if (!summoner) {
+      demacia
+        .getSummonerByName(req.params.name)
+        .then(async (summonerData) => {
+          try {
+            const summoners = await Summoner.find({ id: summonerData.id }).limit(1);
+            if (summoners.length === 0) {
+              summoner = new Summoner(summonerData);
+            } else {
+              summoner = summoners[0];
+              summoner.name = req.params.name;
             }
+            summoner.save();
+          } catch (err) {
+            throw new Error(err);
+          }
 
-            return league.getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
-              if (summoner) {
-                return { ...summoner.toObject(), seasons };
-              }
-            });
-          })
-          .then(async (summonerData) => {
-            const matchData = await demacia.getMatchListByAccountId(summonerData.accountId);
-            const matchList = matchData.matches;
-            for (var i = 0; i < matchList.length; i++) {
-              matchList[i].summonerAccountId = summonerData.accountId;
+          return league.getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
+            if (summoner) {
+              return { ...summoner.toObject(), seasons };
             }
-            await Match.collection.insertMany(matchList);
-
-            return summonerData;
-          })
-          .then((summonerData) => {
-            res.json({
-              ...summonerData,
-              iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summonerData.profileIconId),
-            });
-          })
-          .catch((err) => {
-            res.status(err.response.status).json({ error: err.response.data });
           });
-      } else {
-        league.getOrCreateLeagueData(summoner.id, lastSeason).then((seasons) => {
-          summoner &&
-            res.json({
-              ...summoner.toObject(),
-              seasons,
-              iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
-            });
+        })
+        .then(async (summonerData) => {
+          const matchData = await demacia.getMatchListByAccountId(summonerData.accountId);
+          const matchList = matchData.matches;
+          for (var i = 0; i < matchList.length; i++) {
+            matchList[i].summonerAccountId = summonerData.accountId;
+          }
+          await Match.collection.insertMany(matchList);
+
+          return summonerData;
+        })
+        .then((summonerData) => {
+          res.json({
+            ...summonerData,
+            iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summonerData.profileIconId),
+          });
+        })
+        .catch((err) => {
+          next(err);
         });
-      }
+    } else {
+      const summonerModel = summoner;
+      league
+        .getOrCreateLeagueData(summoner.id, lastSeason)
+        .then((seasons) => {
+          res.json({
+            ...summonerModel.toObject(),
+            seasons,
+            iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summonerModel.profileIconId),
+          });
+        })
+        .catch((err) => {
+          next(err);
+        });
     }
-  );
+  });
 });
 
 router.get('/matches/:accountId/:start/:count', function(req, res, next) {
   const start = Number(req.params.start);
   const count = Number(req.params.count);
 
-  if (start + count > 100) {
+  if (count < 1) {
+    res.status(400).json({ message: 'Cannot get less than 1.' });
+    return;
+  }
+
+  if (count > 100) {
     res.status(400).json({ message: 'Cannot get more than 100.' });
     return;
   }
@@ -103,11 +106,10 @@ router.get('/matches/:accountId/:start/:count', function(req, res, next) {
           }
           const docs = await Match.collection.insertMany(matchListData);
           matchList = docs.ops;
-          matchList = matchList.slice(start, start + count);
+          matchList = matchList.slice(start, start + count).map((item) => item.toObject());
         } catch (err) {
-          if (err.response.status === 404) {
-            matchList = [];
-          }
+          next(err);
+          return;
         }
       }
 

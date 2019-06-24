@@ -6,6 +6,7 @@ pipelines:
         caches:
           - node
         script:
+          - export LOL_API_KEY=RGAPI-f2417de0-bbc0-4e70-88d9-5c13547b0781
           - yarn install
           - yarn test
           - pipe: atlassian/slack-notify:0.3.0

@@ -1,18 +1,23 @@
 import * as console from 'console';
 import * as cookieParser from 'cookie-parser';
+import * as dotenv from 'dotenv';
 import * as express from 'express';
 import * as createError from 'http-errors';
 import * as logger from 'morgan';
 import * as path from 'path';
 import mongo from './db/mongo';
-import { redisClient } from './db/redis';
+import redis from './db/redis';
 import { DDragonHelper } from './lib/demacia/data-dragon/ddragon-helper';
 import { registerStaticChamionList, registerStaticItemList, registerStaticSpellList } from './models/util/static';
 import * as router from './routes';
+dotenv.config();
 
 const app = express();
 
-app.use(logger('dev'));
+if (process.env.NODE_ENV === 'development') {
+  app.use(logger('dev'));
+}
+
 app.use(express.json());
 app.use(
   express.urlencoded({
@@ -41,60 +46,42 @@ app.use(function(
   });
 });
 
-// Mongo
-mongo.on('error', (_, ...args) => {
-  console.error(...args);
-});
-mongo.once('open', () => {
-  console.log('Connected to mongod server');
-});
-mongo.connect();
+if (process.env.NODE_ENV !== 'test') {
+  // Redis
+  redis.connect();
 
-// Redis
-redisClient.auth('XwUNb6ViW7knzlL2rEIZCOGybdJzEliQ', (err) => {
-  if (err) {
-    console.log(err);
-  }
-});
-
-// Init
-DDragonHelper.getLastestVersion()
-  .then((version) => {
-    return DDragonHelper.downloadStaticDataByVersion(version).then(() => {
-      return version;
-    });
-  })
-  .then((version) => {
-    return Promise.all([
-      DDragonHelper.getChampionNameList(version),
-      DDragonHelper.getItemList(version),
-      DDragonHelper.getSummonerSpellList(version),
-    ]);
-  })
-  .then(([champions, items, spells]) => {
-    return Promise.all([
-      registerStaticChamionList(champions),
-      registerStaticItemList(items),
-      registerStaticSpellList(spells),
-    ]);
+  // Mongo
+  mongo.on('error', (_, ...args) => {
+    console.error(...args);
   });
+  mongo.once('open', () => {
+    console.log('Connected to mongod server');
+  });
+  mongo.connect();
 
-// Run Server
-var port = normalizePort(process.env.PORT || '3000');
-app.listen(port);
-
-function normalizePort(val: string) {
-  var port = parseInt(val, 10);
-
-  if (isNaN(port)) {
-    return val;
-  }
-
-  if (port >= 0) {
-    return port;
-  }
-
-  return false;
+  DDragonHelper.getLastestVersion()
+    .then((version) => {
+      return DDragonHelper.downloadStaticDataByVersion(version).then(() => {
+        return version;
+      });
+    })
+    .then((version) => {
+      return Promise.all([
+        DDragonHelper.getChampionNameList(version),
+        DDragonHelper.getItemList(version),
+        DDragonHelper.getSummonerSpellList(version),
+      ]);
+    })
+    .then(([champions, items, spells]) => {
+      return Promise.all([
+        registerStaticChamionList(champions),
+        registerStaticItemList(items),
+        registerStaticSpellList(spells),
+      ]);
+    });
 }
+
+var port = process.env.PORT || 3000;
+app.listen(port);
 
 export default app;

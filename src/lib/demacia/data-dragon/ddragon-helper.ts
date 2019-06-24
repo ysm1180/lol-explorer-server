@@ -2,7 +2,7 @@ import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
-import * as redis from '../../../db/redis';
+import redis from '../../../db/redis';
 
 const DDRAGON_URL = {
   VERSION: 'https://ddragon.leagueoflegends.com/api/versions.json',
@@ -21,9 +21,14 @@ const DDRAGON_URL = {
   BASE_PERK_ICON_URL: 'https://ddragon.leagueoflegends.com/cdn/img/',
 };
 
+let storageRoot = path.join(__dirname, 'data');
 export class DDragonHelper {
   static get storageRoot() {
-    return path.join(__dirname, 'data');
+    return storageRoot;
+  }
+
+  static set storageRoot(pathString: string) {
+    storageRoot = path.resolve(pathString);
   }
 
   static buildStoragePath(version: string): string {
@@ -91,12 +96,12 @@ export class DDragonHelper {
   }
 
   static async getLastestVersion(): Promise<string> {
-    let version = await redis.getAsync('LOL_LAST_VERSION');
+    let version = await redis.get('LOL_LAST_VERSION');
     if (!version) {
       try {
         const res = await axios.get(DDragonHelper.URL_VERSION());
         version = res.data[0];
-        redis.redisClient.set('LOL_LAST_VERSION', version, 'EX', 60 * 60 * 4);
+        redis.set('LOL_LAST_VERSION', version, 60 * 60 * 4);
       } catch (err) {
         console.error(err);
         return '0';
@@ -107,15 +112,11 @@ export class DDragonHelper {
   }
 
   static async getLastestSeason(): Promise<number> {
-    let season = await redis.getAsync('LOL_LAST_SEASON_ID');
+    let season = await redis.get('LOL_LAST_SEASON_ID');
     if (!season) {
       try {
         const version = await DDragonHelper.getLastestVersion();
-        const patchDataPath = path.join(
-          DDragonHelper.buildStoragePath(version),
-          'patch',
-          'patch.json'
-        );
+        const patchDataPath = path.join(DDragonHelper.buildStoragePath(version), 'patch.json');
         const jsonData = JSON.parse(fs.readFileSync(patchDataPath, { encoding: 'utf8' }));
         const patchData = jsonData.patches;
 
@@ -128,7 +129,7 @@ export class DDragonHelper {
           }
         }
 
-        redis.redisClient.set('LOL_LAST_SEASON_ID', season, 'EX', 43200);
+        redis.set('LOL_LAST_SEASON_ID', season, 43200);
       } catch (err) {
         console.error(err);
         return 0;

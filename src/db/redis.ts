@@ -1,15 +1,76 @@
-import * as console from 'console';
+import * as dotenv from 'dotenv';
 import * as redis from 'redis';
-import { promisify } from 'util';
+dotenv.config();
 
-// redis
-export const redisClient = redis.createClient({
-  host: 'redis-17995.c1.ap-southeast-1-1.ec2.cloud.redislabs.com',
-  port: 17995,
-});
+interface IRedisOptions {
+  password?: string;
+  host?: string;
+  port?: number;
+}
 
-redisClient.on('connect', () => {
-  console.log('Connected to redis server');
-});
+export class Redis {
+  private client: redis.RedisClient | undefined = undefined;
 
-export const getAsync = promisify(redisClient.get).bind(redisClient);
+  private host: string;
+  private port: number;
+  private password: string;
+
+  constructor(options: IRedisOptions) {
+    this.host = options.host || '';
+    this.port = options.port || 0;
+    this.password = options.password || '';
+  }
+
+  public connect() {
+    this.client = redis.createClient({
+      host: this.host,
+      port: this.port,
+    });
+
+    if (this.client && this.password) {
+      this.client.auth(this.password);
+    }
+  }
+
+  public get(key: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (this.client) {
+        this.client.get(key, (err, value) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          resolve(value);
+        });
+      } else {
+        resolve('');
+      }
+    });
+  }
+
+  public set(key: string, value: string, duration: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (this.client) {
+        this.client.set(key, value, 'EX', duration, (err, ok) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          resolve();
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+}
+
+const redisOptions: IRedisOptions = {
+  host: process.env.REDIS_HOST || 'localhost',
+  port: Number(process.env.REDIS_PORT),
+  password: process.env.REDIS_PASSWORD,
+};
+
+export default new Redis(redisOptions);

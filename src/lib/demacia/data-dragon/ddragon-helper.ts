@@ -19,7 +19,7 @@ const DDRAGON_URL = {
   ITEM_ICON: 'http://ddragon.leagueoflegends.com/cdn/%s/img/item/%s',
   PATCH: 'https://raw.githubusercontent.com/CommunityDragon/Data/master/patches.json',
   STATIC_PERK_ALL_DATA: 'http://ddragon.leagueoflegends.com/cdn/%s/data/ko_KR/runesReforged.json',
-  BASE_PERK_ICON_URL: 'https://ddragon.leagueoflegends.com/cdn/img/',
+  BASE_PERK_ICON_URL: 'https://ddragon.leagueoflegends.com/cdn/img/%s/',
 };
 
 let storageRoot = path.join(__dirname, 'data');
@@ -97,8 +97,17 @@ export class DDragonHelper {
     return DDRAGON_URL.PATCH;
   }
 
+  static pendingDownloadPromise: Promise<any>;
   static downloadStaticDataByVersion(version: string) {
-    return downloadStaticDataFiles(version, DDragonHelper.buildStoragePath(version));
+    if (DDragonHelper.pendingDownloadPromise) {
+      return DDragonHelper.pendingDownloadPromise;
+    }
+
+    DDragonHelper.pendingDownloadPromise = downloadStaticDataFiles(
+      version,
+      DDragonHelper.buildStoragePath(version)
+    );
+    return DDragonHelper.pendingDownloadPromise;
   }
 
   static async getLatestVersion(): Promise<string> {
@@ -330,8 +339,9 @@ function downloadStaticDataFiles(version: string, dest: string) {
       }
 
       if (!fs.existsSync(downloadFilePath)) {
-        try {
-          axios.get(info.downloadUrl).then((response) => {
+        axios
+          .get(info.downloadUrl)
+          .then((response) => {
             fs.writeFileSync(downloadFilePath, JSON.stringify(response.data));
             console.log(`[${info.downloadFileName}] Written.`);
 
@@ -340,10 +350,10 @@ function downloadStaticDataFiles(version: string, dest: string) {
             } else {
               resolve();
             }
+          })
+          .catch((err) => {
+            reject(err);
           });
-        } catch (error) {
-          reject(error);
-        }
       } else {
         const content = fs.readFileSync(downloadFilePath, { encoding: 'utf8' });
         if (info.callback) {

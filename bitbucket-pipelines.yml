@@ -9,7 +9,3 @@ pipelines:
           - export LOL_API_KEY=RGAPI-f2417de0-bbc0-4e70-88d9-5c13547b0781
           - yarn install
           - yarn test
-          - pipe: atlassian/slack-notify:0.3.0
-            variables:
-              WEBHOOK_URL: 'https://hooks.slack.com/services/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'
-              MESSAGE: '[lol-explorer-server] Complete test.'

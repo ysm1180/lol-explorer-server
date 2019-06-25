@@ -53,9 +53,11 @@ describe('Static data rest api test suite', () => {
 
         getLatestVersionMock.returns(Promise.resolve(versionMock));
         getChampionData.throws();
-        championModelMock
-          .expects('find')
-          .returns(Promise.resolve(championsMock.map((champion) => new Champion(champion))));
+        for (const key in championsMock) {
+          championModelMock
+            .expects('find')
+            .returns(Promise.resolve([new Champion(championsMock[key])]));
+        }
 
         request(app)
           .get(`/static/champion/all`)
@@ -87,14 +89,15 @@ describe('Static data rest api test suite', () => {
         const championsMock = TestUtil.staticMocks.champions;
 
         getLatestVersionMock.returns(Promise.resolve(versionMock));
-        for (let i = 0; i < championsMock.length; i++) {
+        for (const key in championsMock) {
           getChampionData
-            .withArgs(versionMock, championsMock[i].key, championsMock[i].id)
-            .returns(Promise.resolve(TestUtil.staticMocks.staticChampions[i]));
+            .withArgs(versionMock, championsMock[key].key, championsMock[key].id)
+            .returns(Promise.resolve(TestUtil.staticMocks.staticChampions[key]));
+
+          championModelMock
+            .expects('find')
+            .returns(Promise.resolve([new Champion(championsMock[key])]));
         }
-        championModelMock
-          .expects('find')
-          .returns(Promise.resolve(championsMock.map((champion) => new Champion(champion))));
 
         request(app)
           .get(`/static/champion/all`)
@@ -103,27 +106,27 @@ describe('Static data rest api test suite', () => {
             expect(res.status).to.equal(200);
 
             const championList = res.body;
-            for (let i = 0; i < championList.length; i++) {
-              expect(championList[i].key).to.equal(championsMock[i].key);
-              expect(championList[i].iconUrl).to.equal(
+            for (const key in championList) {
+              expect(championList[key].key).to.equal(championsMock[key].key);
+              expect(championList[key].iconUrl).to.equal(
                 DDragonHelper.URL_CHAMPION_ICON(
                   versionMock,
-                  TestUtil.staticMocks.staticChampions[i].image.full
+                  TestUtil.staticMocks.staticChampions[key].image.full
                 )
               );
-              expect(championList[i]).to.not.have.property('image');
-              expect(championList[i]).to.not.have.property('recommended');
+              expect(championList[key]).to.not.have.property('image');
+              expect(championList[key]).to.not.have.property('recommended');
 
-              expect(championList[i].passive).to.not.have.property('image');
-              expect(championList[i].passive.iconUrl).to.equal(
+              expect(championList[key].passive).to.not.have.property('image');
+              expect(championList[key].passive.iconUrl).to.equal(
                 DDragonHelper.URL_CHAMPION_PASSIVE_ICON(
                   versionMock,
-                  TestUtil.staticMocks.staticChampions[i].passive.image.full
+                  TestUtil.staticMocks.staticChampions[key].passive.image.full
                 )
               );
 
-              for (let j = 0; j < championList[i].spells.length; j++) {
-                const championSpell = championList[i].spells[j];
+              for (let j = 0; j < championList[key].spells.length; j++) {
+                const championSpell = championList[key].spells[j];
                 expect(championSpell).to.not.have.property('image');
                 expect(championSpell).to.not.have.property('effect');
                 expect(championSpell).to.not.have.property('effectBurn');
@@ -131,7 +134,7 @@ describe('Static data rest api test suite', () => {
                 expect(championSpell.iconUrl).to.equal(
                   DDragonHelper.URL_CHAMPION_SPELL_ICON(
                     versionMock,
-                    TestUtil.staticMocks.staticChampions[i].spells[j].image.full
+                    TestUtil.staticMocks.staticChampions[key].spells[j].image.full
                   )
                 );
               }
@@ -150,9 +153,9 @@ describe('Static data rest api test suite', () => {
 
         getLatestVersionMock.returns(Promise.resolve(versionMock));
         getItemData.throws();
-        itemModelMock
-          .expects('find')
-          .returns(Promise.resolve(itemsMock.map((item) => new Item(item))));
+        for (const key in itemsMock) {
+          itemModelMock.expects('find').returns(Promise.resolve([new Item(itemsMock[key])]));
+        }
 
         request(app)
           .get(`/static/item/all`)
@@ -185,15 +188,12 @@ describe('Static data rest api test suite', () => {
 
         getLatestVersionMock.returns(Promise.resolve(versionMock));
 
-        for (let i = 0; i < itemsMock.length; i++) {
+        for (const key in itemsMock) {
           getItemData
-            .withArgs(versionMock, itemsMock[i].key)
-            .returns(Promise.resolve(TestUtil.staticMocks.staticItems[i]));
+            .withArgs(versionMock, itemsMock[key].key)
+            .returns(Promise.resolve(TestUtil.staticMocks.staticItems[key]));
+          itemModelMock.expects('find').returns(Promise.resolve([new Item(itemsMock[key])]));
         }
-
-        itemModelMock
-          .expects('find')
-          .returns(Promise.resolve(itemsMock.map((item) => new Item(item))));
 
         request(app)
           .get(`/static/item/all`)
@@ -202,17 +202,20 @@ describe('Static data rest api test suite', () => {
             expect(res.status).to.equal(200);
 
             const itemList = res.body;
-            for (let i = 0; i < itemList.length; i++) {
-              expect(itemList[i].key).to.equal(itemsMock[i].key);
-              expect(itemList[i].iconUrl).to.equal(
-                DDragonHelper.URL_ITEM_ICON(versionMock, TestUtil.staticMocks.staticItems[i].image.full)
+            for (const key in itemList) {
+              expect(itemList[key].key).to.equal(itemsMock[key].key);
+              expect(itemList[key].iconUrl).to.equal(
+                DDragonHelper.URL_ITEM_ICON(
+                  versionMock,
+                  TestUtil.staticMocks.staticItems[key].image.full
+                )
               );
-              expect(itemList[i]).to.not.have.property('image');
-              expect(itemList[i]).to.not.have.property('effect');
-              expect(itemList[i]).to.not.have.property('maps');
-              expect(itemList[i]).to.not.have.property('stats');
-              expect(itemList[i]).to.not.have.property('tags');
-              expect(itemList[i]).to.not.have.property('depth');
+              expect(itemList[key]).to.not.have.property('image');
+              expect(itemList[key]).to.not.have.property('effect');
+              expect(itemList[key]).to.not.have.property('maps');
+              expect(itemList[key]).to.not.have.property('stats');
+              expect(itemList[key]).to.not.have.property('tags');
+              expect(itemList[key]).to.not.have.property('depth');
             }
 
             done();
@@ -228,9 +231,9 @@ describe('Static data rest api test suite', () => {
 
         getLatestVersionMock.returns(Promise.resolve(versionMock));
         getSpellData.throws();
-        spellModelMock
-          .expects('find')
-          .returns(Promise.resolve(spellsMock.map((spell) => new Spell(spell))));
+        for (const key in spellsMock) {
+          spellModelMock.expects('find').returns(Promise.resolve([new Spell(spellsMock[key])]));
+        }
 
         request(app)
           .get(`/static/spell/all`)
@@ -263,15 +266,12 @@ describe('Static data rest api test suite', () => {
 
         getLatestVersionMock.returns(Promise.resolve(versionMock));
 
-        for (let i = 0; i < spellsMock.length; i++) {
+        for (const key in spellsMock) {
           getSpellData
-            .withArgs(versionMock, spellsMock[i].id)
-            .returns(Promise.resolve(TestUtil.staticMocks.staticSpells[i]));
+            .withArgs(versionMock, spellsMock[key].id)
+            .returns(Promise.resolve(TestUtil.staticMocks.staticSpells[key]));
+          spellModelMock.expects('find').returns(Promise.resolve([new Spell(spellsMock[key])]));
         }
-
-        spellModelMock
-          .expects('find')
-          .returns(Promise.resolve(spellsMock.map((spell) => new Spell(spell))));
 
         request(app)
           .get(`/static/spell/all`)
@@ -280,15 +280,18 @@ describe('Static data rest api test suite', () => {
             expect(res.status).to.equal(200);
 
             const spellList = res.body;
-            for (let i = 0; i < spellList.length; i++) {
-              expect(spellList[i].key).to.equal(spellsMock[i].key);
-              expect(spellList[i].iconUrl).to.equal(
-                DDragonHelper.URL_SPELL_ICON(versionMock, TestUtil.staticMocks.staticSpells[i].image.full)
+            for (const key in spellsMock) {
+              expect(spellList[key].key).to.equal(spellsMock[key].key);
+              expect(spellList[key].iconUrl).to.equal(
+                DDragonHelper.URL_SPELL_ICON(
+                  versionMock,
+                  TestUtil.staticMocks.staticSpells[key].image.full
+                )
               );
-              expect(spellList[i]).to.not.have.property('image');
-              expect(spellList[i]).to.not.have.property('effect');
-              expect(spellList[i]).to.not.have.property('effectBurn');
-              expect(spellList[i]).to.not.have.property('modes');
+              expect(spellList[key]).to.not.have.property('image');
+              expect(spellList[key]).to.not.have.property('effect');
+              expect(spellList[key]).to.not.have.property('effectBurn');
+              expect(spellList[key]).to.not.have.property('modes');
             }
 
             done();
@@ -300,13 +303,11 @@ describe('Static data rest api test suite', () => {
   describe('getAllPerk', () => {
     describe('valid', () => {
       it('should get summoner perk client data', (done) => {
-        const spellsMock = TestUtil.staticMocks.spells;
-
         getLatestVersionMock.returns(Promise.resolve(versionMock));
 
-        for (let i = 0; i < spellsMock.length; i++) {
-          getPerkAllData.withArgs(versionMock).returns(Promise.resolve(TestUtil.staticMocks.staticPerks));
-        }
+        getPerkAllData
+          .withArgs(versionMock)
+          .returns(Promise.resolve(TestUtil.staticMocks.staticPerks));
 
         request(app)
           .get(`/static/perk/all`)

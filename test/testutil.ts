@@ -25,16 +25,40 @@ export class TestUtil {
     };
   }
 
-  static get staticMocks() {
+  static get staticMocks(): {
+    champions: { [key: string]: { key: number; id: string } };
+    staticChampions: {
+      [key: string]: {
+        key: string;
+        image: { full: string };
+        spells: { effect: any[]; effectBurn: any[]; image: { full: string } }[];
+        passive: { image: { full: string } };
+        recommended: any;
+      };
+    };
+    items: { [key: string]: { key: number } };
+    staticItems: { [key: string]: { image: { full: string }; tags: any; maps: any; stats: any } };
+    spells: { [key: string]: { key: number; id: string } };
+    staticSpells: {
+      [key: string]: {
+        key: string;
+        image: { full: string };
+        effect: any[];
+        effectBurn: any[];
+        modes: any;
+      };
+    };
+    staticPerks: any[];
+  } {
     return {
-      champions: [
-        {
+      champions: {
+        '266': {
           key: 266,
           id: 'Aatrox',
         },
-      ],
-      staticChampions: [
-        {
+      },
+      staticChampions: {
+        '266': {
           key: '266',
           image: {
             full: 'Aatrox.png',
@@ -62,14 +86,14 @@ export class TestUtil {
           },
           recommended: [{}],
         },
-      ],
-      items: [
-        {
+      },
+      items: {
+        '1004': {
           key: 1004,
         },
-      ],
-      staticItems: [
-        {
+      },
+      staticItems: {
+        '1004': {
           image: {
             full: '1004.png',
           },
@@ -77,15 +101,15 @@ export class TestUtil {
           maps: {},
           stats: {},
         },
-      ],
-      spells: [
-        {
+      },
+      spells: {
+        '21': {
           key: 21,
           id: 'SummonerBarrier',
         },
-      ],
-      staticSpells: [
-        {
+      },
+      staticSpells: {
+        '21': {
           effect: [null, [95], [20], [0], [0], [0], [0], [0], [0], [0], [0]],
           effectBurn: [null, '95', '20', '0', '0', '0', '0', '0', '0', '0', '0'],
           key: '21',
@@ -94,7 +118,7 @@ export class TestUtil {
             full: 'SummonerBarrier.png',
           },
         },
-      ],
+      },
       staticPerks: [{}, {}, {}],
     };
   }

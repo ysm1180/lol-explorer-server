@@ -53,6 +53,46 @@ router.get('/:name', async function(req, res, next) {
   }
 });
 
+router.post('/:name', async function(req, res, next) {
+  try {
+    let summoner = await Summoner.findOne({
+      name: req.params.name,
+    });
+    if (summoner) {
+      const now = new Date(Date.now());
+      summoner.updatedTs.setSeconds(summoner.updatedTs.getSeconds() + 120);
+      if (now < summoner.updatedTs) {
+        const diffSeconds = Math.floor((summoner.updatedTs.getTime() - now.getTime()) / 1000);
+        res.status(429).json({ message: `Please retry after ${diffSeconds} seconds` });
+        return;
+      }
+    }
+
+    let summonerData = await demacia.getSummonerByName(req.params.name);
+    const summoners = await Summoner.find({ id: summonerData.id }).limit(1);
+    if (summoners.length === 0) {
+      summoner = new Summoner(summonerData);
+    } else {
+      summoner = summoners[0];
+      summoner.name = req.params.name;
+    }
+    summoner.updatedTs = new Date(Date.now());
+    summoner.save();
+
+    const lastSeason = await DDragonHelper.getLatestSeason();
+    const seasons = await league.updateLeageData(summoner.id, lastSeason);
+    const version = await DDragonHelper.getLatestVersion();
+
+    res.json({
+      ...summoner.toObject(),
+      seasons,
+      iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   try {
     const start = Number(req.params.start);

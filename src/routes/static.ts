@@ -9,7 +9,7 @@ const router = Router();
 
 router.get('/champion/all', async function(req, res, next) {
   try {
-    const result = [];
+    const result: { [key: string]: any } = {};
     const champions = await Champion.find();
     const version = await DDragonHelper.getLatestVersion();
     for (let i = 0; i < champions.length; i++) {
@@ -41,7 +41,7 @@ router.get('/champion/all', async function(req, res, next) {
       delete clientData.image;
       delete clientData.recommended;
 
-      result.push(clientData);
+      result[rawData.key] = clientData;
     }
 
     res.json(result);
@@ -52,7 +52,7 @@ router.get('/champion/all', async function(req, res, next) {
 
 router.get('/spell/all', async function(req, res, next) {
   try {
-    const result = [];
+    const result: { [key: string]: any } = {};
     const spells = await Spell.find();
     const version = await DDragonHelper.getLatestVersion();
     for (let i = 0; i < spells.length; i++) {
@@ -66,7 +66,7 @@ router.get('/spell/all', async function(req, res, next) {
       delete clientData.effectBurn;
       delete clientData.modes;
 
-      result.push(clientData);
+      result[rawData.key] = clientData;
     }
 
     res.json(result);
@@ -77,7 +77,7 @@ router.get('/spell/all', async function(req, res, next) {
 
 router.get('/item/all', async function(req, res, next) {
   try {
-    const result = [];
+    const result: { [key: string]: any } = {};
     const items = await Item.find();
     const version = await DDragonHelper.getLatestVersion();
     for (let i = 0; i < items.length; i++) {
@@ -93,7 +93,7 @@ router.get('/item/all', async function(req, res, next) {
       delete clientData.tags;
       delete clientData.depth;
 
-      result.push(clientData);
+      result[items[i].key] = clientData;
     }
 
     res.json(result);

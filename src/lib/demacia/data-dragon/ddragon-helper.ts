@@ -4,6 +4,9 @@ import * as path from 'path';
 import * as util from 'util';
 import redis from '../../../db/redis';
 import { CacheStorage } from './storage';
+import { IChampionRawData, IChampionDataDragon } from './types/champion';
+import { IItemDataDragon } from './types/item';
+import { ISpellDataDragon } from './types/spell';
 
 const DDRAGON_URL = {
   VERSION: 'https://ddragon.leagueoflegends.com/api/versions.json',
@@ -24,9 +27,9 @@ const DDRAGON_URL = {
 
 let storageRoot = path.join(__dirname, 'data');
 export class DDragonHelper {
-  private static staticChampionDataCache = new CacheStorage();
-  private static staticItemDataCache = new CacheStorage();
-  private static staticSpellDataCache = new CacheStorage();
+  private static staticChampionDataCache = new CacheStorage<IChampionRawData>();
+  private static staticItemDataCache = new CacheStorage<IItemDataDragon>();
+  private static staticSpellDataCache = new CacheStorage<ISpellDataDragon>();
   private static staticPerkDataCache = new CacheStorage();
 
   static get storageRoot() {
@@ -158,10 +161,10 @@ export class DDragonHelper {
       return Promise.resolve(value);
     } else {
       return getStaticData(version, `champion-${championKey}`)
-        .then((champion) => {
-          champion = champion.data[championId];
-          DDragonHelper.staticChampionDataCache.set(version, champion, key);
-          return champion;
+        .then((champion: IChampionDataDragon) => {
+          const championData = champion.data[championId];
+          DDragonHelper.staticChampionDataCache.set(version, championData, key);
+          return championData;
         })
         .catch((err) => {
           return Promise.reject(err);
@@ -205,7 +208,7 @@ export class DDragonHelper {
         .then((items) => {
           items = items.data;
           DDragonHelper.staticItemDataCache.set(version, items[key], key);
-          return items[key];
+          return <IItemDataDragon>items[key];
         })
         .catch((err) => {
           return Promise.reject(err);
@@ -232,7 +235,7 @@ export class DDragonHelper {
         .then((spells) => {
           spells = spells.data;
           DDragonHelper.staticSpellDataCache.set(version, spells[spellId], spellId);
-          return spells[spellId];
+          return <ISpellDataDragon>spells[spellId];
         })
         .catch((err) => {
           return Promise.reject(err);

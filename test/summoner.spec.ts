@@ -326,6 +326,252 @@ describe('Summoner rest api test suite', () => {
     });
   });
 
+  describe('updateSummoner', () => {
+    describe('error', () => {
+      it('should return status 500 when summoner model findOne method occur error', (done) => {
+        summonerModelMock.expects('findOne').throwsException('Summoner findOne Error!');
+
+        request(app)
+          .post(`/summoner/${encodeURI(summonerMock.name)}`)
+          .expect(500)
+          .end((err, res) => {
+            expect(res.status).to.equal(500);
+
+            done();
+          });
+      });
+
+      it('should return status 500 when summoner model find method occur error', (done) => {
+        ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
+        ddhelperMock.mock('getLatestSeason', Promise.resolve(seasonMock));
+
+        summonerModelMock
+          .expects('findOne')
+          .withArgs({ name: summonerMock.name })
+          .returns(Promise.resolve(null));
+        summonerModelMock.expects('find').throwsException('Summoner find Error!');
+
+        request(app)
+          .post(`/summoner/${encodeURI(summonerMock.name)}`)
+          .expect(500)
+          .end((err, res) => {
+            expect(res.status).to.equal(500);
+
+            done();
+          });
+      });
+    });
+
+    describe('invalid', () => {
+      it('should return status 404 when send invalid summoner name', (done) => {
+        ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
+        ddhelperMock.mock('getLatestSeason', Promise.resolve(seasonMock));
+
+        summonerModelMock
+          .expects('findOne')
+          .withArgs({ name: TestUtil.mocks.invalidSummonerName })
+          .returns(Promise.resolve(null));
+
+        request(app)
+          .post(`/summoner/${encodeURI(TestUtil.mocks.invalidSummonerName)}`)
+          .expect(404)
+          .end((err, res) => {
+            expect(res.status).to.equal(404);
+
+            done();
+          });
+      });
+
+      it('should return status 429 when retry before 120 seconds', (done) => {
+        ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
+        ddhelperMock.mock('getLatestSeason', Promise.resolve(seasonMock));
+
+        summonerModelMock
+          .expects('findOne')
+          .withArgs({ name: summonerMock.name })
+          .returns(
+            Promise.resolve(
+              new Summoner({
+                name: summonerMock.name,
+                id: summonerMock.id,
+                accountId: summonerMock.accountId,
+                updatedTs: new Date(Date.now()),
+              })
+            )
+          );
+
+        request(app)
+          .post(`/summoner/${encodeURI(summonerMock.name)}`)
+          .expect(429)
+          .end((err, res) => {
+            expect(res.status).to.equal(429);
+
+            done();
+          });
+      });
+    });
+
+    describe('valid', () => {
+      it('should update summoner info when summoner data does not exist in database', (done) => {
+        ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
+        ddhelperMock.mock('getLatestSeason', Promise.resolve(seasonMock));
+
+        summonerModelMock
+          .expects('findOne')
+          .withArgs({ name: summonerMock.name })
+          .returns(Promise.resolve(null));
+        summonerModelMock
+          .expects('find')
+          .withArgs({ id: summonerMock.id })
+          .chain('limit')
+          .withArgs(1)
+          .returns(Promise.resolve([]));
+        leagueModelMock.expects('bulkWrite').callsFake(() => {
+          return Promise.resolve();
+        });
+
+        request(app)
+          .post(`/summoner/${encodeURI(summonerMock.name)}`)
+          .expect(200)
+          .end((err, res) => {
+            expect(res.status).to.equal(200);
+
+            summonerModelMock.verify();
+
+            expect(res.body.name).to.equal(summonerMock.name);
+            expect(res.body.id).to.equal(summonerMock.id);
+            expect(res.body.accountId).to.equal(summonerMock.accountId);
+
+            const seasons = res.body.seasons.map((season: { [id: string]: any }) => ({
+              leagueId: season.leagueId,
+              season: season.season,
+            }));
+            expect(seasons).to.deep.include({
+              leagueId: summonerMock.league.id,
+              season: seasonMock,
+            });
+
+            done();
+          });
+      }).timeout(20000);
+
+      it('should update summoner info when summoner data exists in database', (done) => {
+        ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
+        ddhelperMock.mock('getLatestSeason', Promise.resolve(seasonMock));
+
+        const updatedTs = new Date(Date.now() - (60 * 2 + 1) * 1000);
+        summonerModelMock
+          .expects('findOne')
+          .withArgs({ name: summonerMock.name })
+          .returns(
+            Promise.resolve(
+              new Summoner({
+                id: summonerMock.id,
+                accountId: summonerMock.accountId,
+                name: summonerMock.name,
+                updatedTs: updatedTs,
+              })
+            )
+          );
+        summonerModelMock
+          .expects('find')
+          .withArgs({ id: summonerMock.id })
+          .chain('limit')
+          .withArgs(1)
+          .returns(
+            Promise.resolve([
+              new Summoner({
+                id: summonerMock.id,
+                accountId: summonerMock.accountId,
+                name: summonerMock.name,
+                updatedTs: updatedTs,
+              }),
+            ])
+          );
+        leagueModelMock.expects('bulkWrite').callsFake(() => {
+          return Promise.resolve();
+        });
+
+        request(app)
+          .post(`/summoner/${encodeURI(summonerMock.name)}`)
+          .expect(200)
+          .end((err, res) => {
+            expect(res.status).to.equal(200);
+
+            summonerModelMock.verify();
+
+            expect(res.body.name).to.equal(summonerMock.name);
+            expect(res.body.id).to.equal(summonerMock.id);
+            expect(res.body.accountId).to.equal(summonerMock.accountId);
+
+            const seasons = res.body.seasons.map((season: { [id: string]: any }) => ({
+              leagueId: season.leagueId,
+              season: season.season,
+            }));
+            expect(seasons).to.deep.include({
+              leagueId: summonerMock.league.id,
+              season: seasonMock,
+            });
+
+            done();
+          });
+      }).timeout(20000);
+
+      it('should update summoner info when summoner data exists in database but nick is changed', (done) => {
+        ddhelperMock.mock('getLatestVersion', Promise.resolve(versionMock));
+        ddhelperMock.mock('getLatestSeason', Promise.resolve(seasonMock));
+
+        const updatedTs = new Date(Date.now() - (60 * 2 + 1) * 1000);
+        summonerModelMock
+          .expects('findOne')
+          .withArgs({ name: summonerMock.name })
+          .returns(Promise.resolve(null));
+        summonerModelMock
+          .expects('find')
+          .withArgs({ id: summonerMock.id })
+          .chain('limit')
+          .withArgs(1)
+          .returns(
+            Promise.resolve([
+              new Summoner({
+                id: summonerMock.id,
+                accountId: summonerMock.accountId,
+                name: summonerMock.changedName,
+                updatedTs: updatedTs,
+              }),
+            ])
+          );
+        leagueModelMock.expects('bulkWrite').callsFake(() => {
+          return Promise.resolve();
+        });
+
+        request(app)
+          .post(`/summoner/${encodeURI(summonerMock.name)}`)
+          .expect(200)
+          .end((err, res) => {
+            expect(res.status).to.equal(200);
+
+            summonerModelMock.verify();
+
+            expect(res.body.name).to.equal(summonerMock.name);
+            expect(res.body.id).to.equal(summonerMock.id);
+            expect(res.body.accountId).to.equal(summonerMock.accountId);
+
+            const seasons = res.body.seasons.map((season: { [id: string]: any }) => ({
+              leagueId: season.leagueId,
+              season: season.season,
+            }));
+            expect(seasons).to.deep.include({
+              leagueId: summonerMock.league.id,
+              season: seasonMock,
+            });
+
+            done();
+          });
+      }).timeout(20000);
+    });
+  });
+
   describe('getMatchList', () => {
     describe('error', () => {
       it('should return status 500 when match model find method occur error', (done) => {

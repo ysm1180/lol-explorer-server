@@ -1,11 +1,16 @@
 import * as express from 'express';
-import * as lodash from 'lodash';
 import demacia from '../common/demacia';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
 import * as league from '../models/util/league';
+import {
+  IGameClientData,
+  IGameParticipantClientData,
+  IGamePlayerClientData,
+  IGameTeamClientData,
+} from './models/game';
 
 const router = express.Router();
 
@@ -63,7 +68,9 @@ router.post('/:name', async function(req, res, next) {
       summoner.updatedTs.setSeconds(summoner.updatedTs.getSeconds() + 120);
       if (now < summoner.updatedTs) {
         const diffSeconds = Math.floor((summoner.updatedTs.getTime() - now.getTime()) / 1000);
-        res.status(429).json({ message: `Please retry after ${diffSeconds} seconds` });
+        res
+          .status(429)
+          .json({ message: `Please retry after ${diffSeconds} seconds`, seconds: diffSeconds });
         return;
       }
     }
@@ -88,6 +95,13 @@ router.post('/:name', async function(req, res, next) {
       seasons,
       iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/matches/:accountId', async function(req, res, next) {
+  try {
   } catch (err) {
     next(err);
   }
@@ -145,19 +159,142 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
       const result: Object[] = [];
       matchList.forEach((match, idx) => {
         const data = { ...match };
-        const gameClientData = lodash.cloneDeep(gameModels[idx]);
-        gameClientData.participants.forEach((participant) => {
-          const { item0, item1, item2, item3, item4, item5, item6 } = participant.stats;
-          participant.stats.items = [item0, item1, item2, item3, item4, item5, item6];
+        const gameClientData: IGameClientData = {
+          gameDuration: 0,
+          mapId: 0,
+          requester: { isWin: false, teamId: 0, participantId: 0 },
+          teams: {},
+        };
+        const originalGameData = gameModels[idx];
 
-          delete participant.stats.item0;
-          delete participant.stats.item1;
-          delete participant.stats.item2;
-          delete participant.stats.item3;
-          delete participant.stats.item4;
-          delete participant.stats.item5;
-          delete participant.stats.item6;
+        gameClientData.gameDuration = originalGameData.gameDuration;
+        gameClientData.mapId = originalGameData.mapId;
+        originalGameData.teams.forEach((team) => {
+          const data: IGameTeamClientData = {} as any;
+
+          data.isWin = team.win === 'Win' ? true : false;
+          data.teamId = team.teamId;
+          data.towerKills = team.towerKills;
+          data.dragonKills = team.dragonKills;
+          data.baronKills = team.baronKills;
+          data.firstBlood = team.firstBlood;
+          data.participants = {};
+
+          gameClientData.teams[data.teamId] = data;
         });
+
+        const playerInfoList: { [id: string]: IGamePlayerClientData } = {};
+        originalGameData.participantIdentities.forEach((participantIdentity) => {
+          const player: IGamePlayerClientData = {} as any;
+
+          const {
+            accountId,
+            summonerId,
+            summonerName,
+            profileIcon,
+            platformId,
+          } = participantIdentity.player;
+          player.accountId = accountId;
+          player.summonerId = summonerId;
+          player.summonerName = summonerName;
+          player.platformId = platformId;
+          player.profileIcon = profileIcon;
+
+          playerInfoList[participantIdentity.participantId] = player;
+
+          if (accountId === req.params.accountId) {
+            gameClientData.requester.participantId = participantIdentity.participantId;
+          }
+        });
+
+        originalGameData.participants.forEach((participant) => {
+          const participantClinetData: IGameParticipantClientData = {} as any;
+
+          const { item0, item1, item2, item3, item4, item5, item6 } = participant.stats;
+          const { spell1Id, spell2Id } = participant;
+          participantClinetData.player = playerInfoList[participant.participantId];
+          participantClinetData.teamId = participant.teamId;
+          participantClinetData.championId = participant.championId;
+          participantClinetData.items = [item0, item1, item2, item3, item4, item5, item6];
+          participantClinetData.spells = [spell1Id, spell2Id];
+          participantClinetData.stats = {} as any;
+
+          const {
+            kills,
+            deaths,
+            assists,
+            doubleKills,
+            tripleKills,
+            quadraKills,
+            pentaKills,
+            totalDamageDealt,
+            trueDamageDealt,
+            totalDamageDealtToChampions,
+            trueDamageDealtToChampions,
+            totalHeal,
+            visionScore,
+            totalDamageTaken,
+            trueDamageTaken,
+            goldEarned,
+            turretKills,
+            totalMinionsKilled,
+            neutralMinionsKilled,
+            neutralMinionsKilledTeamJungle,
+            neutralMinionsKilledEnemyJungle,
+            champLevel,
+            firstBloodKill,
+            firstTowerKill,
+            perkPrimaryStyle,
+            perkSubStyle,
+            perk0,
+            perk1,
+            perk2,
+            perk3,
+            perk4,
+            perk5,
+            statPerk0,
+            statPerk1,
+            statPerk2,
+          } = participant.stats;
+          participantClinetData.stats.kills = kills;
+          participantClinetData.stats.deaths = deaths;
+          participantClinetData.stats.assists = assists;
+          participantClinetData.stats.doubleKills = doubleKills;
+          participantClinetData.stats.tripleKills = tripleKills;
+          participantClinetData.stats.quadraKills = quadraKills;
+          participantClinetData.stats.pentaKills = pentaKills;
+          participantClinetData.stats.totalDamageDealt = totalDamageDealt;
+          participantClinetData.stats.trueDamageDealt = trueDamageDealt;
+          participantClinetData.stats.totalDamageDealtToChampions = totalDamageDealtToChampions;
+          participantClinetData.stats.trueDamageDealtToChampions = trueDamageDealtToChampions;
+          participantClinetData.stats.totalHeal = totalHeal;
+          participantClinetData.stats.visionScore = visionScore;
+          participantClinetData.stats.totalDamageTaken = totalDamageTaken;
+          participantClinetData.stats.trueDamageTaken = trueDamageTaken;
+          participantClinetData.stats.goldEarned = goldEarned;
+          participantClinetData.stats.turretKills = turretKills;
+          participantClinetData.stats.totalMinionsKilled = totalMinionsKilled;
+          participantClinetData.stats.neutralMinionsKilled = neutralMinionsKilled;
+          participantClinetData.stats.neutralMinionsKilledTeamJungle = neutralMinionsKilledTeamJungle;
+          participantClinetData.stats.neutralMinionsKilledEnemyJungle = neutralMinionsKilledEnemyJungle;
+          participantClinetData.stats.champLevel = champLevel;
+          participantClinetData.stats.firstBloodKill = firstBloodKill;
+          participantClinetData.stats.firstTowerKill = firstTowerKill;
+          participantClinetData.stats.perkPrimaryStyle = perkPrimaryStyle;
+          participantClinetData.stats.perkSubStyle = perkSubStyle;
+          participantClinetData.stats.perks = [perk0, perk1, perk2, perk3, perk4, perk5];
+          participantClinetData.stats.statPerks = [statPerk0, statPerk1, statPerk2];
+          participantClinetData.timeline = participant.timeline;
+
+          const team = gameClientData.teams[participant.teamId];
+          team.participants[participant.participantId] = participantClinetData;
+
+          if (participant.participantId == gameClientData.requester.participantId) {
+            gameClientData.requester.teamId = participant.teamId;
+            gameClientData.requester.isWin = team.isWin;
+          }
+        });
+
         result.push({ ...data, gameInfo: gameClientData });
       });
 

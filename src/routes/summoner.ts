@@ -63,6 +63,7 @@ router.post('/:name', async function(req, res, next) {
     let summoner = await Summoner.findOne({
       name: req.params.name,
     });
+
     if (summoner) {
       const now = new Date(Date.now());
       summoner.updatedTs.setSeconds(summoner.updatedTs.getSeconds() + 120);
@@ -86,14 +87,31 @@ router.post('/:name', async function(req, res, next) {
     summoner.updatedTs = new Date(Date.now());
     summoner.save();
 
+    // Season
     const lastSeason = await DDragonHelper.getLatestSeason();
-    const seasons = await league.updateLeageData(summoner.id, lastSeason);
-    const version = await DDragonHelper.getLatestVersion();
+    await league.updateLeageData(summoner.id, lastSeason);
+
+    // Match
+    const data = await demacia.getMatchListByAccountId(summoner.accountId);
+    const matchListData = data.matches;
+    const insertMatchDataList = [];
+    for (var i = 0; i < matchListData.length; i++) {
+      const matchData = await Match.find({
+        summonerAccountId: summoner.accountId,
+        gameId: matchListData[i].gameId,
+      }).limit(1);
+
+      if (matchData.length === 0) {
+        insertMatchDataList.push(matchListData[i]);
+      }
+    }
+    if (insertMatchDataList.length > 0) {
+      await Match.collection.insertMany(insertMatchDataList);
+    }
 
     res.json({
-      ...summoner.toObject(),
-      seasons,
-      iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
+      success: true,
+      updatedMatchCount: insertMatchDataList.length,
     });
   } catch (err) {
     next(err);
@@ -102,6 +120,11 @@ router.post('/:name', async function(req, res, next) {
 
 router.post('/matches/:accountId', async function(req, res, next) {
   try {
+    const data = await demacia.getMatchListByAccountId(req.params.accountId);
+    const matchListData = data.matches;
+    for (var i = 0; i < matchListData.length; i++) {
+      matchListData[i].summonerAccountId = req.params.accountId;
+    }
   } catch (err) {
     next(err);
   }
@@ -130,9 +153,11 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
       .limit(count);
 
     let matchList = items.map((item) => item.toObject());
+
     if (items.length === 0) {
+      // First call
       const data = await demacia.getMatchListByAccountId(req.params.accountId);
-      let matchListData = data.matches;
+      const matchListData = data.matches;
       for (var i = 0; i < matchListData.length; i++) {
         matchListData[i].summonerAccountId = req.params.accountId;
       }

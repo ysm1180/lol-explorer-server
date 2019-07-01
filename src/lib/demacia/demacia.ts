@@ -32,9 +32,15 @@ export class Demacia {
     );
   }
 
-  public getMatchListByAccountId(accountId: string) {
+  public getMatchListByAccountId(
+    accountId: string,
+    beginIndex: number = 0,
+    endIndex: number = 100
+  ) {
     return this.callLolApi<{ matches: IMatchApiData[] }>(
-      `${this.apiUrl}/match/v4/matchlists/by-account/${accountId}`
+      `${
+        this.apiUrl
+      }/match/v4/matchlists/by-account/${accountId}?beginindex=${beginIndex}&endIndex=${endIndex}`
     );
   }
 

@@ -174,6 +174,7 @@ export interface IGameApiData {
   teams: IGameTeamData[];
   participants: IGameParticipantData[];
   participantIdentities: IGameParticipantIdentity[];
+  gameVersion: string;
 }
 
 export interface ILeagueApiData {

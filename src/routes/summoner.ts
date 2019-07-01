@@ -4,13 +4,9 @@ import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
+import { updateChampionAnalysisByGame } from '../models/util/game';
 import * as league from '../models/util/league';
-import {
-  IGameClientData,
-  IGameParticipantClientData,
-  IGamePlayerClientData,
-  IGameTeamClientData,
-} from './models/game';
+import { IGameClientData, IGameParticipantClientData, IGamePlayerClientData, IGameTeamClientData } from './models/game';
 
 const router = express.Router();
 
@@ -214,6 +210,9 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
           const data = await demacia.getMatchInfoByGameId(gameId);
           const game = new Game(data);
           game.save();
+
+          updateChampionAnalysisByGame(game);
+
           gameModels.push(game);
         } else {
           gameModels.push(games[0]);

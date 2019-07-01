@@ -1,7 +1,7 @@
 import mongo from '../src/db/mongo';
 
 // mongo db
-const truncateCollections = ['summoners', 'leagues', 'matches', 'games'];
+const truncateCollections = ['summoners', 'leagues', 'matches', 'games', 'game_champions'];
 mongo.on('error', (_, ...args) => console.error(...args));
 mongo.on('open', (db) => {
   const promises: Promise<any>[] = [];

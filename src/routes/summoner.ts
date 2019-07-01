@@ -204,6 +204,9 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
           data.baronKills = team.baronKills;
           data.firstBlood = team.firstBlood;
           data.participants = {};
+          data.totalKills = 0;
+          data.totalDeaths = 0;
+          data.totalAssists = 0;
 
           gameClientData.teams[data.teamId] = data;
         });
@@ -313,6 +316,9 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
 
           const team = gameClientData.teams[participant.teamId];
           team.participants[participant.participantId] = participantClinetData;
+          team.totalKills += kills;
+          team.totalDeaths += deaths;
+          team.totalAssists += assists;
 
           if (participant.participantId == gameClientData.requester.participantId) {
             gameClientData.requester.teamId = participant.teamId;

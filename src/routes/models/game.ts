@@ -17,6 +17,9 @@ export interface IGameTeamClientData {
   baronKills: number;
   dragonKills: number;
   participants: { [id: string]: IGameParticipantClientData };
+  totalKills: number;
+  totalDeaths: number;
+  totalAssists: number;
 }
 
 export interface IGamePlayerClientData {

@@ -3,6 +3,7 @@ const nodeExternals = require('webpack-node-externals');
 const NodemonPlugin = require('nodemon-webpack-plugin');
 
 const environment = process.env.NODE_ENV || 'development';
+const isProd = environment === 'production';
 
 module.exports = {
   optimization: {
@@ -30,6 +31,7 @@ module.exports = {
               useBabel: true,
               babelCore: '@babel/core',
               useCache: true,
+              configFileName: isProd ? 'tsconfig.prod.json' : 'tsconfig.json',
             },
           },
         ],

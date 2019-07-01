@@ -202,7 +202,7 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
       }
       const docs = await Match.collection.insertMany(matchListData);
       matchList = docs.ops;
-      matchList = matchList.slice(start, start + count).map((item) => item.toObject());
+      matchList = matchList.slice(start, start + count);
     }
 
     if (matchList.length > 0) {

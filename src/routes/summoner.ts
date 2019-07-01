@@ -140,6 +140,7 @@ router.post('/:name', async function(req, res, next) {
       }).limit(1);
 
       if (matchData.length === 0) {
+        matchListData[i].summonerAccountId = summoner.accountId;
         insertMatchDataList.push(matchListData[i]);
       }
     }

@@ -1,10 +1,18 @@
-image: node:10.15.3
+
 
 pipelines:
-  default:
+  branches:
+    master:
     - step:
+        image: node:10.15.3
         caches:
           - node
         script:
           - yarn install
           - yarn test
+    - step:
+        name: Deploy to AWS
+        deployment: production
+        image: atlassian/pipelines-awscli
+        script:
+            - aws deploy push --application-name $APPLICATION_NAME --s3-location s3://$S3_BUCKET/lol_server_$BITBUCKET_BUILD_NUMBER --ignore-hidden-files

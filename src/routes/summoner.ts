@@ -95,7 +95,7 @@ router.post('/:name', async function(req, res, next) {
     const data = await demacia.getMatchListByAccountId(summoner.accountId);
     const matchListData = data.matches;
     const insertMatchDataList = [];
-    for (var i = 0; i < matchListData.length; i++) {
+    for (let i = 0; i < matchListData.length; i++) {
       const matchData = await Match.find({
         summonerAccountId: summoner.accountId,
         gameId: matchListData[i].gameId,

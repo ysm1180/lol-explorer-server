@@ -58,6 +58,44 @@ router.get('/:name', async function(req, res, next) {
   }
 });
 
+router.get('/byAccount/:accountId', async function(req, res, next) {
+  try {
+    let summoner = await Summoner.findOne({
+      accountId: req.params.accountId,
+    });
+    const lastSeason = await DDragonHelper.getLatestSeason();
+    const version = await DDragonHelper.getLatestVersion();
+    if (!summoner) {
+      let summonerData = await demacia.getSummonerByAccountId(req.params.accountId);
+      const summoner = new Summoner(summonerData);
+      summoner.save();
+
+      const matchData = await demacia.getMatchListByAccountId(summonerData.accountId);
+      const matchList = matchData.matches;
+      for (var i = 0; i < matchList.length; i++) {
+        matchList[i].summonerAccountId = summonerData.accountId;
+      }
+      await Match.collection.insertMany(matchList);
+
+      const seasons = await league.getOrCreateLeagueData(summoner.id, lastSeason);
+      res.json({
+        ...summoner.toObject(),
+        seasons,
+        iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summonerData.profileIconId),
+      });
+    } else {
+      const seasons = await league.getOrCreateLeagueData(summoner.id, lastSeason);
+      res.json({
+        ...summoner.toObject(),
+        seasons,
+        iconUrl: DDragonHelper.URL_PROFILE_ICON(version, summoner.profileIconId),
+      });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/:name', async function(req, res, next) {
   try {
     let summoner = await Summoner.findOne({

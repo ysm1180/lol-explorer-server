@@ -204,9 +204,7 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
           const game = new Game(data);
           game.save();
 
-          console.time('Update');
           updateChampionAnalysisByGame(game);
-          console.timeEnd('Update');
 
           gameModels.push(game);
         } else {

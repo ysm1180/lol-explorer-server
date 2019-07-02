@@ -28,13 +28,6 @@ router.get('/:name', async function(req, res, next) {
       }
       summoner.save();
 
-      const matchData = await demacia.getMatchListByAccountId(summonerData.accountId);
-      const matchList = matchData.matches;
-      for (var i = 0; i < matchList.length; i++) {
-        matchList[i].summonerAccountId = summonerData.accountId;
-      }
-      await Match.collection.insertMany(matchList);
-
       const seasons = await league.getOrCreateLeagueData(summoner.id, lastSeason);
       res.json({
         ...summoner.toObject(),
@@ -211,7 +204,9 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
           const game = new Game(data);
           game.save();
 
+          console.time('Update');
           updateChampionAnalysisByGame(game);
+          console.timeEnd('Update');
 
           gameModels.push(game);
         } else {

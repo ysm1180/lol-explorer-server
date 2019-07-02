@@ -381,6 +381,7 @@ router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
     const lastSeason = await DDragonHelper.getLatestSeason();
     if (seasonId > lastSeason) {
       res.status(400).json({ message: 'Invalid season id' });
+      return;
     }
 
     const gameChampions = await GameChampion.find({
@@ -424,4 +425,5 @@ router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
     next(err);
   }
 });
+
 export default router;

@@ -1,19 +1,17 @@
 import { IGameModel } from '../game';
 import GameChampion from '../game-champion';
 
-export async function updateSummonerChampionAnalysisByGame(summonerAccountId: string, game: IGameModel) {
+export async function updateChampionAnalysisByGame(game: IGameModel) {
   try {
-    const summoner = game.participantIdentities.find(
-      (pi) => pi.player.accountId === summonerAccountId
-    );
-    if (summoner) {
+    const summoners = game.participantIdentities;
+    for (let i = 0; i < summoners.length; i++) {
       const participant = game.participants.find((p) => {
-        return p.participantId === summoner.participantId;
+        return p.participantId === summoners[i].participantId;
       });
-
+      const accountId = summoners[i].player.accountId;
       if (participant) {
         const gameChampions = await GameChampion.find({
-          summonerAccountId: summonerAccountId,
+          summonerAccountId: accountId,
           platformId: game.platformId,
           championKey: participant.championId,
           queueId: game.queueId,
@@ -24,7 +22,7 @@ export async function updateSummonerChampionAnalysisByGame(summonerAccountId: st
 
         if (gameChampions.length === 0) {
           const gameChampion = new GameChampion({
-            summonerAccountId: summonerAccountId,
+            summonerAccountId: accountId,
             platformId: game.platformId,
             championKey: participant.championId,
             queueId: game.queueId,

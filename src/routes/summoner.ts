@@ -425,6 +425,7 @@ router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
 
     const matchList = await Match.find({
       summonerAccountId: req.params.accountId,
+      season: seasonId,
     });
     const gameIds = matchList.map((match) => match.gameId);
     const savedGames = await Game.find().in('gameId', gameIds);

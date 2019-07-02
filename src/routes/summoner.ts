@@ -2,14 +2,18 @@ import * as express from 'express';
 import demacia from '../common/demacia';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
+import GameChampion from '../models/game-champion';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
+import { updateChampionAnalysisByGame } from '../models/util/game';
 import * as league from '../models/util/league';
+import { getMatchListExactly } from '../models/util/match';
 import {
   IGameClientData,
   IGameParticipantClientData,
   IGamePlayerClientData,
   IGameTeamClientData,
+  IGameChampion,
 } from './models/game';
 
 const router = express.Router();
@@ -31,13 +35,6 @@ router.get('/:name', async function(req, res, next) {
         summoner.name = req.params.name;
       }
       summoner.save();
-
-      const matchData = await demacia.getMatchListByAccountId(summonerData.accountId);
-      const matchList = matchData.matches;
-      for (var i = 0; i < matchList.length; i++) {
-        matchList[i].summonerAccountId = summonerData.accountId;
-      }
-      await Match.collection.insertMany(matchList);
 
       const seasons = await league.getOrCreateLeagueData(summoner.id, lastSeason);
       res.json({
@@ -157,18 +154,6 @@ router.post('/:name', async function(req, res, next) {
   }
 });
 
-router.post('/matches/:accountId', async function(req, res, next) {
-  try {
-    const data = await demacia.getMatchListByAccountId(req.params.accountId);
-    const matchListData = data.matches;
-    for (var i = 0; i < matchListData.length; i++) {
-      matchListData[i].summonerAccountId = req.params.accountId;
-    }
-  } catch (err) {
-    next(err);
-  }
-});
-
 router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   try {
     const start = Number(req.params.start);
@@ -194,15 +179,23 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
     let matchList = items.map((item) => item.toObject());
 
     if (items.length === 0) {
-      // First call
-      const data = await demacia.getMatchListByAccountId(req.params.accountId);
-      const matchListData = data.matches;
-      for (var i = 0; i < matchListData.length; i++) {
-        matchListData[i].summonerAccountId = req.params.accountId;
-      }
-      const docs = await Match.collection.insertMany(matchListData);
+      const insertMatchDataList = await getMatchListExactly(req.params.accountId, start, 100);
+      const docs = await Match.collection.insertMany(insertMatchDataList);
       matchList = docs.ops;
-      matchList = matchList.slice(start, start + count);
+      matchList = matchList.slice(0, count);
+    } else if (items.length < count) {
+      if (!items[items.length - 1].first) {
+        const insertMatchDataList = await getMatchListExactly(
+          req.params.accountId,
+          start,
+          count - items.length
+        );
+        const docs = await Match.collection.insertMany(insertMatchDataList);
+        matchList.push(...docs.ops);
+      }
+    } else if (items.length > count) {
+      res.status(400).json({ message: 'Bad match list count.' });
+      return;
     }
 
     if (matchList.length > 0) {
@@ -214,6 +207,9 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
           const data = await demacia.getMatchInfoByGameId(gameId);
           const game = new Game(data);
           game.save();
+
+          updateChampionAnalysisByGame(game);
+
           gameModels.push(game);
         } else {
           gameModels.push(games[0]);
@@ -377,4 +373,55 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   }
 });
 
+router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
+  try {
+    const seasonId = Number(req.params.seasonId);
+    const accountId = req.params.accountId;
+
+    const lastSeason = await DDragonHelper.getLatestSeason();
+    if (seasonId > lastSeason) {
+      res.status(400).json({ message: 'Invalid season id' });
+    }
+
+    const gameChampions = await GameChampion.find({
+      summonerAccountId: accountId,
+      seasonId,
+    });
+
+    const result: { [id: string]: IGameChampion } = {};
+    for (let i = 0; i < gameChampions.length; i++) {
+      const gameChampion = gameChampions[i];
+
+      if (result[gameChampion.championKey]) {
+        const champion = result[gameChampion.championKey];
+        champion.wins += gameChampion.wins;
+        champion.losses += gameChampion.losses;
+        champion.averageKills = (champion.averageKills + gameChampion.averageKills) / 2;
+        champion.averageDeaths = (champion.averageDeaths + gameChampion.averageDeaths) / 2;
+        champion.averageAssists = (champion.averageAssists + gameChampion.averageAssists) / 2;
+        champion.averageCS = (champion.averageCS + gameChampion.averageCS) / 2;
+        champion.averageEarnedGold =
+          (champion.averageEarnedGold + gameChampion.averageEarnedGold) / 2;
+        champion.averageGameDuration =
+          (champion.averageGameDuration + gameChampion.averageGameDuration) / 2;
+      } else {
+        const champion: IGameChampion = {} as any;
+        champion.key = gameChampion.championKey;
+        champion.wins = gameChampion.wins;
+        champion.losses = gameChampion.losses;
+        champion.averageKills = gameChampion.averageKills;
+        champion.averageDeaths = gameChampion.averageDeaths;
+        champion.averageAssists = gameChampion.averageAssists;
+        champion.averageCS = gameChampion.averageCS;
+        champion.averageEarnedGold = gameChampion.averageEarnedGold;
+        champion.averageGameDuration = gameChampion.averageGameDuration;
+        result[champion.key] = champion;
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 export default router;

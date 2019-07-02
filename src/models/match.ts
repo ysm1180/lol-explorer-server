@@ -13,6 +13,7 @@ var matchSchema = new Schema({
   timestamp: Number,
   role: String,
   lane: String,
+  first: Boolean,
 });
 
 export default model<IMatchModel>('match', matchSchema);

@@ -40,7 +40,7 @@ export class Demacia {
     return this.callLolApi<{ matches: IMatchApiData[] }>(
       `${
         this.apiUrl
-      }/match/v4/matchlists/by-account/${accountId}?beginindex=${beginIndex}&endIndex=${endIndex}`
+      }/match/v4/matchlists/by-account/${accountId}?beginIndex=${beginIndex}&endIndex=${endIndex}`
     );
   }
 

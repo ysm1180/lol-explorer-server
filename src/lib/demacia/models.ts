@@ -9,6 +9,7 @@ export interface IMatchApiData {
   summonerAccountId: string;
   gameId: number;
   champion: number;
+  first: boolean;
 }
 
 export interface IGameTeamData {
@@ -174,6 +175,7 @@ export interface IGameApiData {
   teams: IGameTeamData[];
   participants: IGameParticipantData[];
   participantIdentities: IGameParticipantIdentity[];
+  gameVersion: string;
 }
 
 export interface ILeagueApiData {

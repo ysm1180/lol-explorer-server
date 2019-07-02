@@ -183,8 +183,7 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
     let matchList = items.map((item) => item.toObject());
 
     if (items.length === 0) {
-      // First call
-      const data = await demacia.getMatchListByAccountId(req.params.accountId);
+      const data = await demacia.getMatchListByAccountId(req.params.accountId, start, start + 100);
       const matchListData = data.matches;
       for (var i = 0; i < matchListData.length; i++) {
         matchListData[i].summonerAccountId = req.params.accountId;

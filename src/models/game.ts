@@ -3,6 +3,7 @@ import * as models from '../lib/demacia/models';
 
 export interface IGameModel extends models.IGameApiData, Document {
   seasonId: number;
+  recordedAccounts: string[];
 }
 
 var gameSchema = new Schema({
@@ -16,6 +17,7 @@ var gameSchema = new Schema({
   gameVersion: String,
   gameMode: String,
   gameType: String,
+  recordedAccounts: [String],
   teams: {
     type: ['Mixed'],
   },

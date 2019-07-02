@@ -6,6 +6,7 @@ import Match from '../models/match';
 import Summoner from '../models/summoner';
 import { updateChampionAnalysisByGame } from '../models/util/game';
 import * as league from '../models/util/league';
+import { getMatchListExactly } from '../models/util/match';
 import { IGameClientData, IGameParticipantClientData, IGamePlayerClientData, IGameTeamClientData } from './models/game';
 
 const router = express.Router();
@@ -146,18 +147,6 @@ router.post('/:name', async function(req, res, next) {
   }
 });
 
-router.post('/matches/:accountId', async function(req, res, next) {
-  try {
-    const data = await demacia.getMatchListByAccountId(req.params.accountId);
-    const matchListData = data.matches;
-    for (var i = 0; i < matchListData.length; i++) {
-      matchListData[i].summonerAccountId = req.params.accountId;
-    }
-  } catch (err) {
-    next(err);
-  }
-});
-
 router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   try {
     const start = Number(req.params.start);
@@ -183,14 +172,23 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
     let matchList = items.map((item) => item.toObject());
 
     if (items.length === 0) {
-      const data = await demacia.getMatchListByAccountId(req.params.accountId, start, start + 100);
-      const matchListData = data.matches;
-      for (var i = 0; i < matchListData.length; i++) {
-        matchListData[i].summonerAccountId = req.params.accountId;
-      }
-      const docs = await Match.collection.insertMany(matchListData);
+      const insertMatchDataList = await getMatchListExactly(req.params.accountId, start, 100);
+      const docs = await Match.collection.insertMany(insertMatchDataList);
       matchList = docs.ops;
-      matchList = matchList.slice(start, start + count);
+      matchList = matchList.slice(0, count);
+    } else if (items.length < count) {
+      if (!items[items.length - 1].first) {
+        const insertMatchDataList = await getMatchListExactly(
+          req.params.accountId,
+          start,
+          count - items.length
+        );
+        const docs = await Match.collection.insertMany(insertMatchDataList);
+        matchList.push(...docs.ops);
+      }
+    } else if (items.length > count) {
+      res.status(400).json({ message: 'Bad match list count.' });
+      return;
     }
 
     if (matchList.length > 0) {

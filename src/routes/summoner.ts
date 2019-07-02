@@ -389,12 +389,15 @@ router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
       seasonId,
     });
 
-    const result: { [id: string]: IGameChampion } = {};
+    const result: { totalGames: number; champions: { [id: string]: IGameChampion } } = {
+      totalGames: 0,
+      champions: {},
+    };
     for (let i = 0; i < gameChampions.length; i++) {
       const gameChampion = gameChampions[i];
 
-      if (result[gameChampion.championKey]) {
-        const champion = result[gameChampion.championKey];
+      if (result.champions[gameChampion.championKey]) {
+        const champion = result.champions[gameChampion.championKey];
         champion.wins += gameChampion.wins;
         champion.losses += gameChampion.losses;
         champion.averageKills = (champion.averageKills + gameChampion.averageKills) / 2;
@@ -416,9 +419,17 @@ router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
         champion.averageCS = gameChampion.averageCS;
         champion.averageEarnedGold = gameChampion.averageEarnedGold;
         champion.averageGameDuration = gameChampion.averageGameDuration;
-        result[champion.key] = champion;
+        result.champions[champion.key] = champion;
       }
     }
+
+    const matchList = await Match.find({
+      summonerAccountId: req.params.accountId,
+    });
+    const gameIds = matchList.map((match) => match.gameId);
+    const savedGames = await Game.find().in('gameId', gameIds);
+
+    result.totalGames = savedGames.length;
 
     res.json(result);
   } catch (err) {

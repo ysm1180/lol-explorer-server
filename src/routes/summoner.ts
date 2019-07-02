@@ -2,12 +2,19 @@ import * as express from 'express';
 import demacia from '../common/demacia';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
+import GameChampion from '../models/game-champion';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
 import { updateChampionAnalysisByGame } from '../models/util/game';
 import * as league from '../models/util/league';
 import { getMatchListExactly } from '../models/util/match';
-import { IGameClientData, IGameParticipantClientData, IGamePlayerClientData, IGameTeamClientData } from './models/game';
+import {
+  IGameClientData,
+  IGameParticipantClientData,
+  IGamePlayerClientData,
+  IGameTeamClientData,
+  IGameChampion,
+} from './models/game';
 
 const router = express.Router();
 
@@ -366,4 +373,55 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   }
 });
 
+router.get('/champions/:seasonId/:accountId', async function(req, res, next) {
+  try {
+    const seasonId = Number(req.params.seasonId);
+    const accountId = req.params.accountId;
+
+    const lastSeason = await DDragonHelper.getLatestSeason();
+    if (seasonId > lastSeason) {
+      res.status(400).json({ message: 'Invalid season id' });
+    }
+
+    const gameChampions = await GameChampion.find({
+      summonerAccountId: accountId,
+      seasonId,
+    });
+
+    const result: { [id: string]: IGameChampion } = {};
+    for (let i = 0; i < gameChampions.length; i++) {
+      const gameChampion = gameChampions[i];
+
+      if (result[gameChampion.championKey]) {
+        const champion = result[gameChampion.championKey];
+        champion.wins += gameChampion.wins;
+        champion.losses += gameChampion.losses;
+        champion.averageKills = (champion.averageKills + gameChampion.averageKills) / 2;
+        champion.averageDeaths = (champion.averageDeaths + gameChampion.averageDeaths) / 2;
+        champion.averageAssists = (champion.averageAssists + gameChampion.averageAssists) / 2;
+        champion.averageCS = (champion.averageCS + gameChampion.averageCS) / 2;
+        champion.averageEarnedGold =
+          (champion.averageEarnedGold + gameChampion.averageEarnedGold) / 2;
+        champion.averageGameDuration =
+          (champion.averageGameDuration + gameChampion.averageGameDuration) / 2;
+      } else {
+        const champion: IGameChampion = {} as any;
+        champion.key = gameChampion.championKey;
+        champion.wins = gameChampion.wins;
+        champion.losses = gameChampion.losses;
+        champion.averageKills = gameChampion.averageKills;
+        champion.averageDeaths = gameChampion.averageDeaths;
+        champion.averageAssists = gameChampion.averageAssists;
+        champion.averageCS = gameChampion.averageCS;
+        champion.averageEarnedGold = gameChampion.averageEarnedGold;
+        champion.averageGameDuration = gameChampion.averageGameDuration;
+        result[champion.key] = champion;
+      }
+    }
+
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
 export default router;

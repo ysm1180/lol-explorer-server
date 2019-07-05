@@ -77,3 +77,23 @@ export async function getMatchListExactly(accountId: string, start: number, coun
     return Promise.reject(err);
   }
 }
+
+export async function getMatchListRecentlyAll(accountId: string) {
+  try {
+    const resultList = [];
+
+    let i = 0;
+    while (true) {
+      const matchList = await getMatchListExactly(accountId, i, 100);
+      resultList.push(...matchList);
+      if (matchList.length < 100) {
+        break;
+      }
+      i += 100;
+    }
+
+    return Promise.resolve(resultList);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}

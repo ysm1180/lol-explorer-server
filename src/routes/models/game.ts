@@ -73,17 +73,3 @@ export interface IGameParticipantClientData {
     lane: string;
   };
 }
-
-export interface IGameChampion {
-  key: number;
-  queueId: number;
-  mapId: number;
-  wins: number;
-  losses: number;
-  averageKills: number;
-  averageDeaths: number;
-  averageAssists: number;
-  averageCS: number;
-  averageEarnedGold: number;
-  averageGameDuration: number;
-}

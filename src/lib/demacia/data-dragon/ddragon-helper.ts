@@ -4,8 +4,9 @@ import * as path from 'path';
 import * as util from 'util';
 import redis from '../../../db/redis';
 import { CacheStorage } from './storage';
-import { IChampionRawData, IChampionDataDragon } from './types/champion';
+import { IChampionDataDragon, IChampionRawData } from './types/champion';
 import { IItemDataDragon } from './types/item';
+import { IPerkDataDragon } from './types/perk';
 import { ISpellDataDragon } from './types/spell';
 
 const DDRAGON_URL = {
@@ -30,7 +31,7 @@ export class DDragonHelper {
   private static staticChampionDataCache = new CacheStorage<IChampionRawData>();
   private static staticItemDataCache = new CacheStorage<IItemDataDragon>();
   private static staticSpellDataCache = new CacheStorage<ISpellDataDragon>();
-  private static staticPerkDataCache = new CacheStorage();
+  private static staticPerkDataCache = new CacheStorage<IPerkDataDragon[]>();
 
   static get storageRoot() {
     return storageRoot;
@@ -251,7 +252,7 @@ export class DDragonHelper {
       return getStaticData(version, 'perk_all')
         .then((data) => {
           DDragonHelper.staticPerkDataCache.set(version, data);
-          return data;
+          return <IPerkDataDragon[]>data;
         })
         .catch((err) => {
           return Promise.reject(err);

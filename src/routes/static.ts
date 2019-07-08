@@ -105,9 +105,16 @@ router.get('/item/all', async function(req, res, next) {
 router.get('/perk/all', function(req, res, next) {
   DDragonHelper.getLatestVersion().then(async (version) => {
     const rawData = await DDragonHelper.getPerkAllData(version);
-    const clientData = <any[]>lodash.cloneDeep(rawData);
-    for (let i = 0; i < clientData.length; i++) {
-      clientData[i].baseIconUrl = DDragonHelper.URL_PERK_ICON(version);
+    const clientData = {} as any;
+    for (let i = 0; i < rawData.length; i++) {
+      clientData[rawData[i].id] = lodash.cloneDeep(rawData[i]);
+      for (let j = 0; j < rawData[i].slots.length; j++) {
+        clientData[rawData[i].id].slots[j].runes = {};
+        for (let k = 0; k < rawData[i].slots[j].runes.length; k++) {
+          clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id] = rawData[i].slots[j].runes[k];
+        }
+      }
+      clientData.baseIconUrl = DDragonHelper.URL_PERK_ICON(version);
     }
     res.json(clientData);
   });

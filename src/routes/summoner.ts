@@ -1,6 +1,7 @@
 import * as express from 'express';
 import * as lodash from 'lodash';
 import demacia from '../common/demacia';
+import { MAP_ID } from '../lib/demacia/constants';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
 import GameChampion from '../models/game-champion';
@@ -363,7 +364,7 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
     const gameChampions = await GameChampion.find({
       summonerAccountId: accountId,
       seasonId,
-      mapId: 11,
+      mapId: MAP_ID.SUMMONER_RIFT,
     });
 
     const result: {

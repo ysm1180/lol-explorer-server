@@ -114,7 +114,7 @@ router.get('/perk/all', function(req, res, next) {
           clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id] = rawData[i].slots[j].runes[k];
         }
       }
-      clientData.baseIconUrl = DDragonHelper.URL_PERK_ICON(version);
+      clientData.baseIconUrl = DDragonHelper.URL_PERK_ICON();
     }
     res.json(clientData);
   });

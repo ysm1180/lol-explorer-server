@@ -23,7 +23,7 @@ const DDRAGON_URL = {
   ITEM_ICON: 'http://ddragon.leagueoflegends.com/cdn/%s/img/item/%s',
   PATCH: 'https://raw.githubusercontent.com/CommunityDragon/Data/master/patches.json',
   STATIC_PERK_ALL_DATA: 'http://ddragon.leagueoflegends.com/cdn/%s/data/ko_KR/runesReforged.json',
-  BASE_PERK_ICON_URL: 'https://ddragon.leagueoflegends.com/cdn/img/%s/',
+  BASE_PERK_ICON_URL: 'https://ddragon.leagueoflegends.com/cdn/img/',
 };
 
 let storageRoot = path.join(__dirname, 'data');
@@ -73,8 +73,8 @@ export class DDragonHelper {
     return util.format(DDRAGON_URL.ITEM_ICON, version, itemIconName);
   }
 
-  static URL_PERK_ICON(version: string): string {
-    return util.format(DDRAGON_URL.BASE_PERK_ICON_URL, version);
+  static URL_PERK_ICON(): string {
+    return util.format(DDRAGON_URL.BASE_PERK_ICON_URL);
   }
 
   static URL_STATIC_CHAMPIONS_DATA(version: string): string {

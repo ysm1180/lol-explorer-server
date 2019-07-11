@@ -16,6 +16,7 @@ export interface IGameChampionModel extends Document {
   averageCS: number;
   averageEarnedGold: number;
   averageGameDuration: number;
+  predictPosition: Position;
 }
 
 var gameChampionSchema = new Schema({
@@ -34,6 +35,7 @@ var gameChampionSchema = new Schema({
   averageCS: Number,
   averageEarnedGold: Number,
   averageGameDuration: Number,
+  predictPosition: Number,
 });
 
 export default model<IGameChampionModel>('game_champion', gameChampionSchema);

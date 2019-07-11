@@ -92,17 +92,15 @@ export class RiotRateLimiter {
 
   private appLimits: RateLimit[] = [];
 
-  constructor() {
+  constructor(private token: string) {
     this.limitersPerPlatformId = {};
   }
 
   public executing<T>({
     url,
-    token,
     strategy = STRATEGY.BURST,
   }: {
     url: string;
-    token: string;
     strategy: STRATEGY;
   }): Promise<T> {
     const { platformId, apiMethod } = RiotRateLimiter.extractPlatformIdAndMethodFromUrl(url);
@@ -122,7 +120,6 @@ export class RiotRateLimiter {
       (rateLimiter: RateLimiter) => {
         return this.executingScheduledCallback<T>(rateLimiter, {
           url,
-          token,
           strategy,
         });
       }
@@ -133,11 +130,9 @@ export class RiotRateLimiter {
     rateLimiter: RateLimiter,
     {
       url,
-      token,
       strategy = STRATEGY.BURST,
     }: {
       url: string;
-      token: string;
       strategy: STRATEGY;
     }
   ): Promise<T> {
@@ -145,7 +140,7 @@ export class RiotRateLimiter {
       let options: AxiosRequestConfig = {
         url: url,
         method: 'GET',
-        headers: { 'X-Riot-Token': token },
+        headers: { 'X-Riot-Token': this.token },
       };
 
       return axios(options)
@@ -202,7 +197,15 @@ export class RiotRateLimiter {
           return response.data;
         })
         .catch((err) => {
-          if (err.response.status !== 429) {
+          if (err.code === 'ETIMEDOUT') {
+            console.warn(`${url} TIMED OUT`);
+            return rateLimiter.rescheduling<T>((rateLimiter: RateLimiter) => {
+              return this.executingScheduledCallback<T>(rateLimiter, {
+                url,
+                strategy,
+              });
+            });
+          } else if (!err.response || err.response.status !== 429) {
             throw err;
           } else {
             let retryAfterMS: number = 0;
@@ -225,7 +228,6 @@ export class RiotRateLimiter {
             return rateLimiter.rescheduling<T>((rateLimiter: RateLimiter) => {
               return this.executingScheduledCallback<T>(rateLimiter, {
                 url,
-                token,
                 strategy,
               });
             });
@@ -286,6 +288,7 @@ export class RiotRateLimiter {
         });
 
         if (optionsForLimit) {
+          limit.updateSilently(optionsForLimit);
           return true;
         } else {
           limit.dispose();

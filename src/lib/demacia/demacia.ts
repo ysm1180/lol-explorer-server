@@ -8,7 +8,7 @@ export class Demacia {
   private rateLimiter: RiotRateLimiter;
 
   constructor(private apiKey: string, private strategy: STRATEGY = STRATEGY.SPREAD) {
-    this.rateLimiter = new RiotRateLimiter();
+    this.rateLimiter = new RiotRateLimiter(this.apiKey);
     this.baseUrl = 'https://kr.api.riotgames.com/lol';
   }
 
@@ -92,7 +92,6 @@ export class Demacia {
     try {
       const result = await this.rateLimiter.executing<T>({
         url,
-        token: this.apiKey,
         strategy: this.strategy,
       });
       return result;

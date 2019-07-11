@@ -13,6 +13,22 @@ export type RateLimiterOptions = {
 export const RATELIMIT_BACKOFF_DURATION_MS_DEFAULT = 1000;
 
 export class RateLimiter {
+  public static createSyncRateLimit(): RateLimit {
+    return new RateLimit({
+      requests: 1,
+      seconds: RATELIMIT_INIT_SECONDS,
+      type: RATELIMIT_TYPE.SYNC,
+    });
+  }
+
+  private static createBackoffRateLimit(seconds: number) {
+    return new RateLimit({
+      requests: 0,
+      seconds: seconds,
+      type: RATELIMIT_TYPE.BACKOFF,
+    });
+  }
+
   private limits: RateLimit[];
   private strategy: STRATEGY;
 
@@ -150,12 +166,12 @@ export class RateLimiter {
     return this.limits;
   }
 
-  public getLimitStrings(): string[] {
-    return this.limits.map((limit) => limit.toString() + '\r\n');
+  public getLimitString(): string {
+    return this.limits.map((limit) => limit.toString()).join('\r\n');
   }
 
   public toString(): string {
-    let rateLimiterSetupInfo = `RateLimiter with ${this.getStrategyString()} - Limits: \r\n${this.getLimitStrings()}`;
+    let rateLimiterSetupInfo = `RateLimiter with ${this.getStrategyString()} - Limits: \r\n${this.getLimitString()}`;
     let spreadLimitExecutionInfo = `${
       this.isStrategySpread() ? `next execution in ${this.getSpreadInterval() / 1000} seconds` : ''
     }`;
@@ -271,9 +287,6 @@ export class RateLimiter {
     return this.queue;
   }
 
-  /**
-   * Procecces the first item of the queue
-   * */
   private processSpreadLimitInterval() {
     if (this.queue.length !== 0) {
       const { fn, resolve, reject } = this.queue.shift()!;
@@ -391,30 +404,12 @@ export class RateLimiter {
   private getSpreadInterval(): number {
     return this.limits.reduce((longestInterval: number, limit: RateLimit) => {
       const interval = limit.getSpreadInterval();
-      if (longestInterval === null) return interval;
+      if (longestInterval === 0) return interval;
       return longestInterval > interval ? longestInterval : interval;
     }, 0);
   }
 
   public isInitializing() {
     return !!this.limits.find((limit) => limit.type === RATELIMIT_TYPE.SYNC);
-  }
-
-  public static createSyncRateLimit(): RateLimit {
-    return new RateLimit({
-      requests: 1,
-      seconds: RATELIMIT_INIT_SECONDS,
-      count: 0,
-      type: RATELIMIT_TYPE.SYNC,
-    });
-  }
-
-  private static createBackoffRateLimit(seconds: number) {
-    return new RateLimit({
-      requests: 0,
-      seconds: seconds,
-      count: 0,
-      type: RATELIMIT_TYPE.BACKOFF,
-    });
   }
 }

@@ -27,7 +27,7 @@ export const RATELIMIT_TYPE_STRINGS = {
   [RATELIMIT_TYPE.SYNC]: 'sync',
   [RATELIMIT_TYPE.BACKOFF]: 'backoff',
 };
-export const RATELIMIT_INIT_SECONDS: number = 7200;
+export const RATELIMIT_INIT_SECONDS: number = 2;
 
 export const FACTOR_REQUEST_MARGIN_BELOW_5_SEC: number = 0.75;
 export const FACTOR_REQUEST_MARGIN_ABOVE_5_SEC: number = 0.9;

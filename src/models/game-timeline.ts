@@ -1,7 +1,7 @@
 import { Document, model, Schema } from 'mongoose';
 import * as models from '../lib/demacia/models';
 
-export interface IGameModel extends models.IGameTimelineApiData, Document {
+export interface IGameTimelineModel extends models.IGameTimelineApiData, Document {
   gameId: number;
 }
 
@@ -13,4 +13,4 @@ var gameTimelineSchema = new Schema({
   frameInterval: Number,
 });
 
-export default model<IGameModel>('game_timeline', gameTimelineSchema);
+export default model<IGameTimelineModel>('game_timeline', gameTimelineSchema);

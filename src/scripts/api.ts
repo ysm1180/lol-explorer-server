@@ -80,7 +80,7 @@ export class LolStatisticsWrapper {
     for (let i = 0; i < this.keys.length; i++) {
       promises.push(this.run(i)!);
     }
-    await Promise.all(promises);
+    return await Promise.all(promises);
   }
 }
 

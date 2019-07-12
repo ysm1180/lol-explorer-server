@@ -3,25 +3,26 @@ import * as express from 'express';
 import mongo from '../db/mongo';
 import { GAME_QUEUE_ID, LEAGUE_QUEUE_TYPE, MAP_ID, POSITION } from '../lib/demacia/constants';
 import { Demacia } from '../lib/demacia/demacia';
-import { STRATEGY } from '../lib/demacia/ratelimiter/ratelimiter';
 import GameTimeline from '../models/game-timeline';
+import DevApi from '../models/statistics/api';
 import StatisticsChampion from '../models/statistics/champion';
 import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
 import { getPurchasedItemEvents, getSkillSlotEvents } from '../models/util/timeline';
-import { apiKey } from './api';
+import devApi, { IDevApiClassData } from './api';
 
 const app = express();
 mongo.connect();
 
-const demacia = [
-  new Demacia(apiKey[0], STRATEGY.SPREAD),
-  new Demacia(apiKey[1], STRATEGY.SPREAD),
-  new Demacia(apiKey[2], STRATEGY.SPREAD),
-  new Demacia(apiKey[3], STRATEGY.SPREAD),
-  new Demacia(apiKey[4], STRATEGY.SPREAD),
-];
+const router = express.Router();
+router.post('/add/:key', async (req, res, next) => {
+  const key = req.params.key;
+  devApi.addKey(key);
+  devApi.run(devApi.length() - 1);
+});
+
+app.use('/api', router);
 
 const summonerList = async () => {
   const summoners = await StatisticsSummoner.find({ tier: 'CHALLENGER' }).select({ name: 1 });
@@ -34,84 +35,57 @@ const summonerList = async () => {
   return [...new Set(result)];
 };
 
-summonerList()
-  .then(async (summonerNameList) => {
-    try {
-      let summoners: any[] = [];
-      const summonerAccountList: string[][] = [];
+DevApi.find().then(async (data) => {
+  try {
+    const keys = data.map((k) => k.key);
+    for (let i = 0; i < keys.length; i++) {
+      devApi.addKey(keys[i]);
+    }
+    devApi.setExpiredFn(async (key: string) => {
+      await axios.post('http://localhost:5555/expired', { api_key: key });
+      console.log(`EXPIRED ${key}`);
+      devApi.removeKey(key);
+    });
+    devApi.setSharedData(await summonerList());
+    devApi.setProcessFunction(async (nameList: string[], apiClassData: IDevApiClassData) => {
+      try {
+        const accountIdList: string[] = [];
 
-      const summonerFn = async (i: number, j: number) => {
-        try {
-          summoners[j] = null;
+        const summonerFn = async (index: number) => {
+          const summoner = await apiClassData.demacia.getSummonerByName(nameList[index]);
+          console.log(`[${new Date().toTimeString()}] GET summoner ${nameList[index]}`);
+          accountIdList.push(summoner.accountId);
+        };
 
-          if (summonerNameList.length - 1 >= i + j) {
-            summoners[j] = await demacia[j].getSummonerByName(summonerNameList[i + j]);
-          }
+        for (let i = 0; i < nameList.length; i++) {
+          await summonerFn(i);
+        }
 
-          if (summoners[j]) {
-            console.log(
-              `[${new Date().toTimeString()}] ${j} : GET summoner ${summonerNameList[i + j]}`
-            );
-            summonerAccountList[j].push(summoners[j].accountId);
-          }
-        } catch (err) {
-          if (err.response && err.response.status === 403) {
-            axios.post('http://gasi.asuscomm.com:5001/expired', { api_key: apiKey[j] });
-            console.log(`EXPIRED ${j}: ${apiKey[j]}`);
+        for (let i = 0; i < accountIdList.length; i++) {
+          const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountIdList[i]))
+            .matches;
+          for (let j = 0; j < matchList.length; j++) {
+            console.log(`[${new Date().toTimeString()}] START analyze ${matchList[j].gameId}`);
+            await analyzeGame(apiClassData.demacia, matchList[j].gameId);
           }
         }
-      };
-
-      for (let j = 0; j < apiKey.length; j++) {
-        summonerAccountList.push([]);
+      } catch (err) {
+        console.log(err.response.data);
+        return Promise.reject(err);
       }
-
-      for (let i = 0; i < summonerNameList.length; i = i + apiKey.length) {
-        const promises = [];
-        summoners = [];
-        for (let j = 0; j < apiKey.length; j++) {
-          summoners.push(null);
-          promises.push(summonerFn(i, j));
-        }
-
-        await Promise.all(promises);
-      }
-
-      const fn = async (index: number) => {
-        for (let i = 0; i < summonerAccountList[index].length; i++) {
-          try {
-            const matchList = (await demacia[index].getMatchListByAccountId(
-              summonerAccountList[index][i]
-            )).matches;
-            for (let j = 0; j < matchList.length; j++) {
-              console.log(
-                `[${new Date().toTimeString()}] START analyze ${index} ${matchList[j].gameId}`
-              );
-              await analyzeGame(demacia[index], matchList[j].gameId);
-            }
-          } catch (err) {
-            if (err.response && err.response.status === 403) {
-              axios.post('http://gasi.asuscomm.com:5001/expired', { api_key: apiKey[index] });
-              console.log(`EXPIRED ${index}: ${apiKey[index]}`);
-              break;
-            }
-          }
-        }
-      };
-
-      await Promise.all([fn(0), fn(1), fn(2), fn(3), fn(4)]);
 
       console.log('END');
-      return Promise.resolve();
-    } catch (err) {
-      return Promise.reject(err);
-    }
-  })
-  .catch((err) => {
-    console.log(err);
-  });
+    });
 
-var port = process.env.PORT || 4000;
+    await devApi.runAll();
+    return;
+    
+  } catch (err) {
+    return Promise.reject(err);
+  }
+});
+
+var port = process.env.PORT || 6666;
 app.listen(port);
 
 export async function analyzeGame(demacia: Demacia, gameId: number) {
@@ -121,12 +95,14 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       const gameData = await demacia.getMatchInfoByGameId(gameId);
       game = new StatisticsGame(gameData);
       game.isAnalyze = [false, false, false, false, false, false, false, false, false, false];
+      await game.save();
     }
 
     let timeline = await GameTimeline.findOne({ gameId });
     if (!timeline) {
       const timelineData = await demacia.getMatchTimelineByGameId(gameId);
       timeline = new GameTimeline({ ...timelineData, gameId });
+      await timeline.save();
     }
 
     if (
@@ -135,21 +111,22 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
         game.queueId === GAME_QUEUE_ID.RIFT_FLEX_RANK)
     ) {
       const positions = getPositions(game);
+      const champions = [];
 
       for (let i = 0; i < game.participantIdentities.length; i++) {
         const summonerData = game.participantIdentities[i].player;
         const participantId = game.participantIdentities[i].participantId;
         if (positions[participantId] !== POSITION.UNKNOWN && !game.isAnalyze[participantId]) {
+          const summoner = await demacia.getSummonerByName(summonerData.summonerName);
+          const summonerLeagueApiData = await demacia.getLeagueBySummonerId(summoner.id);
+
           game.isAnalyze[participantId] = true;
+          await game.save();
 
           const participantData = game.participants.find(
             (participant) => participant.participantId === participantId
           )!;
           const teamData = game.teams.find((team) => team.teamId === participantData.teamId)!;
-
-          const summonerLeagueApiData = await demacia.getLeagueBySummonerId(
-            summonerData.summonerId
-          );
 
           let tier: string = 'UNRANKED';
           for (let j = 0; j < summonerLeagueApiData.length; j++) {
@@ -171,7 +148,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
           const items = getPurchasedItemEvents(timeline, participantId);
           const position = positions[participantId];
 
-          const data = new StatisticsChampion({
+          champions.push({
             gameId,
             isWin,
             championKey,
@@ -186,12 +163,10 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
             items,
             position,
           });
-          data.save();
         }
       }
 
-      game.save();
-      timeline.save();
+      await StatisticsChampion.insertMany(champions);
     }
 
     return Promise.resolve();

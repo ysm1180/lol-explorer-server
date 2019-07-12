@@ -52,39 +52,40 @@ DevApi.find().then(async (data) => {
     });
     devApi.setSharedData(await summonerList());
     devApi.setProcessFunction(async (nameList: string[], apiClassData: IDevApiClassData) => {
-      try {
-        const accountIdList: string[] = [];
+      const accountIdList: string[] = [];
 
-        const summonerFn = async (index: number) => {
-          try {
-            const summoner = await apiClassData.demacia.getSummonerByName(nameList[index]);
-            console.log(`[${new Date().toTimeString()}] GET summoner ${nameList[index]}`);
-            accountIdList.push(summoner.accountId);
-          } catch (err) {
-            if (err.response && err.response.status === 404) {
-              console.log(`Summoner is not founded ${nameList[index]}`);
-              return Promise.resolve();
-            } else {
-              return Promise.reject(err);
-            }
+      const summonerFn = async (index: number) => {
+        try {
+          const summoner = await apiClassData.demacia.getSummonerByName(nameList[index]);
+          console.log(`[${new Date().toTimeString()}] GET summoner ${nameList[index]}`);
+          accountIdList.push(summoner.accountId);
+        } catch (err) {
+          if (err.response && err.response.status === 404) {
+            console.log(`Summoner is not founded ${nameList[index]}`);
           }
-        };
-
-        for (let i = 0; i < nameList.length; i++) {
-          await summonerFn(i);
+          return Promise.resolve();
         }
+      };
 
-        for (let i = 0; i < accountIdList.length; i++) {
+      for (let i = 0; i < nameList.length; i++) {
+        await summonerFn(i);
+      }
+
+      for (let i = 0; i < accountIdList.length; i++) {
+        try {
           const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountIdList[i]))
             .matches;
           for (let j = 0; j < matchList.length; j++) {
             console.log(`[${new Date().toTimeString()}] START analyze ${matchList[j].gameId}`);
             await analyzeGame(apiClassData.demacia, matchList[j].gameId);
           }
+        } catch (err) {
+          if (err.response) {
+            console.log(err.response.data);
+          } else {
+            console.log(err);
+          }
         }
-      } catch (err) {
-        console.log(err.response.data);
-        return Promise.reject(err);
       }
 
       console.log('END');

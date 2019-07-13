@@ -5,6 +5,7 @@ type ExpiredFunction = (key: string) => Promise<void>;
 type ProcessFunction = (dataArray: any[], classData: IDevApiClassData) => Promise<void>;
 export interface IDevApiClassData {
   demacia: Demacia;
+  index: number;
 }
 
 export class LolStatisticsWrapper {
@@ -57,6 +58,7 @@ export class LolStatisticsWrapper {
 
       const classData: IDevApiClassData = {
         demacia: this.libs[index],
+        index,
       };
 
       return this.process(nameList, classData).catch((err) => {

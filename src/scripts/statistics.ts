@@ -81,18 +81,24 @@ DevApi.find().then(async (data) => {
           const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountIdList[i]))
             .matches;
           for (let j = 0; j < matchList.length; j++) {
-            console.log(`[${new Date().toTimeString()}] START analyze ${matchList[j].gameId}`);
+            console.log(
+              `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.index} Analyze ${
+                matchList[j].gameId
+              }`
+            );
             await analyzeGame(apiClassData.demacia, matchList[j].gameId);
           }
         } catch (err) {
+          console.error('[MATCH ERROR]');
+
           if (err.response && err.response.status === 403) {
             return Promise.reject(err);
           }
 
           if (err.response) {
-            console.log(err.response.data);
+            console.error(err.response.data);
           } else {
-            console.log(err);
+            console.error(err);
           }
         }
       }
@@ -201,6 +207,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
 
     return Promise.resolve();
   } catch (err) {
+    console.error('[GAME ANALYZE ERROR]');
     if (err.response) {
       console.log(err.response.data);
     } else {

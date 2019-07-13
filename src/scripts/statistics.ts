@@ -18,31 +18,46 @@ mongo.connect();
 const router = express.Router();
 router.post('/add/:key', async (req, res, next) => {
   const key = req.params.key;
-  devApi.addKey(key);
-  devApi.run(devApi.length() - 1);
-  console.log(`ADD KEY AND RERUN ${key}`);
+  console.log(`RUN PROCESS ${key}`);
+  devApi.run(key);
+  
   res.send('OK');
 });
 
 app.use('/api', router);
 
 const summonerList = async () => {
-  const summoners = await StatisticsSummoner.find({ tier: 'CHALLENGER' }).select({ name: 1 });
+  const summoners = await StatisticsSummoner.find({
+    $or: [{ tier: 'CHALLENGER' }, { tier: 'GRANDMASTER' }, { tier: 'MASTER' }],
+  }).select({ name: 1 });
   const result = [];
 
   for (let i = 0; i < summoners.length; i++) {
-    result.push(summoners[i].name);
+    result.push({
+      name: summoners[i].name,
+      selected: false,
+    });
   }
 
   return [...new Set(result)];
 };
 
+const getSummonerAccountId = async (demacia: Demacia, name: string) => {
+  try {
+    const summoner = await demacia.getSummonerByName(name);
+    console.log(`[${new Date().toLocaleTimeString('ko-KR')}] GET summoner ${name}`);
+    return summoner.accountId;
+  } catch (err) {
+    if (err.response && err.response.status === 404) {
+      console.log(`Summoner is not founded ${name}`);
+    }
+    return Promise.reject(err);
+  }
+};
+
 DevApi.find().then(async (data) => {
   try {
     const keys = data.map((k) => k.key);
-    for (let i = 0; i < keys.length; i++) {
-      devApi.addKey(keys[i]);
-    }
     devApi.setExpiredFn(async (key: string) => {
       try {
         await axios.post('http://localhost:5555/expired', { api_key: key });
@@ -53,60 +68,48 @@ DevApi.find().then(async (data) => {
       }
     });
     devApi.setSharedData(await summonerList());
-    devApi.setProcessFunction(async (nameList: string[], apiClassData: IDevApiClassData) => {
-      const accountIdList: string[] = [];
+    devApi.setProcessFunction(
+      async (sharedData: { name: string; selected: boolean }[], apiClassData: IDevApiClassData) => {
+        let unselectedList = sharedData.filter((data) => !data.selected);
 
-      const summonerFn = async (index: number) => {
-        try {
-          const summoner = await apiClassData.demacia.getSummonerByName(nameList[index]);
-          console.log(`[${new Date().toTimeString()}] GET summoner ${nameList[index]}`);
-          accountIdList.push(summoner.accountId);
-        } catch (err) {
-          if (err.response && err.response.status === 403) {
-            return Promise.reject(err);
+        while (unselectedList.length > 0) {
+          const idx = Math.floor(Math.random() * unselectedList.length);
+          if (!unselectedList[idx].selected) {
+            try {
+              unselectedList[idx].selected = true;
+
+              const name = unselectedList[idx].name;
+              const accountId = await getSummonerAccountId(apiClassData.demacia, name);
+              const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountId))
+                .matches;
+              for (let j = 0; j < matchList.length; j++) {
+                console.log(
+                  `[${new Date().toLocaleTimeString('ko-KR')}] Analyze ${matchList[j].gameId}`
+                );
+                await analyzeGame(apiClassData.demacia, matchList[j].gameId);
+              }
+            } catch (err) {
+              if (err.response && err.response.status === 403) {
+                unselectedList[idx].selected = false;
+                return Promise.reject(err);
+              }
+
+              if (err.response) {
+                console.error(err.response.data);
+              } else {
+                console.error(err);
+              }
+            }
           }
-          if (err.response && err.response.status === 404) {
-            console.log(`Summoner is not founded ${nameList[index]}`);
-          }
-          return Promise.resolve();
+
+          unselectedList = sharedData.filter((data) => !data.selected);
         }
-      };
 
-      for (let i = 0; i < nameList.length; i++) {
-        await summonerFn(i);
+        console.log('END');
       }
+    );
 
-      for (let i = 0; i < accountIdList.length; i++) {
-        try {
-          const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountIdList[i]))
-            .matches;
-          for (let j = 0; j < matchList.length; j++) {
-            console.log(
-              `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.index} Analyze ${
-                matchList[j].gameId
-              }`
-            );
-            await analyzeGame(apiClassData.demacia, matchList[j].gameId);
-          }
-        } catch (err) {
-          console.error('[MATCH ERROR]');
-
-          if (err.response && err.response.status === 403) {
-            return Promise.reject(err);
-          }
-
-          if (err.response) {
-            console.error(err.response.data);
-          } else {
-            console.error(err);
-          }
-        }
-      }
-
-      console.log('END');
-    });
-
-    await devApi.runAll();
+    await devApi.runAll(keys);
     return;
   } catch (err) {
     return Promise.reject(err);

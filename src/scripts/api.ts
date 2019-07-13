@@ -5,32 +5,18 @@ type ExpiredFunction = (key: string) => Promise<void>;
 type ProcessFunction = (dataArray: any[], classData: IDevApiClassData) => Promise<void>;
 export interface IDevApiClassData {
   demacia: Demacia;
-  index: number;
 }
 
 export class LolStatisticsWrapper {
-  private libs: Demacia[] = [];
-  private keys: string[] = [];
   private sharedData: any;
   private expiredFunction: ExpiredFunction = () => Promise.resolve();
   private process: ProcessFunction = () => Promise.resolve();
-  private running: (Promise<void> | null)[] = [];
+  private running: { [key: string]: Promise<void> } = {};
 
   constructor() {}
 
-  public addKey(key: string) {
-    this.keys.push(key);
-    this.libs.push(new Demacia(key, STRATEGY.SPREAD));
-    this.running.push(null);
-  }
-
   public removeKey(key: string) {
-    const index = this.keys.indexOf(key);
-    if (index !== -1) {
-      this.keys.splice(index, 1);
-      this.libs.splice(index, 1);
-      this.running.splice(index, 1);
-    }
+    delete this.running[key];
   }
 
   public setSharedData(data: any) {
@@ -45,44 +31,39 @@ export class LolStatisticsWrapper {
     this.expiredFunction = fn;
   }
 
-  public run(index: number) {
-    if (this.running[index]) {
-      return this.running[index];
+  public run(key: string) {
+    if (this.running[key]) {
+      return this.running[key];
     }
 
-    this.running[index] = Promise.resolve().then(() => {
-      const nameList: any[] = [];
-      for (let i = 0; i < this.sharedData.length; i += this.keys.length) {
-        nameList.push(this.sharedData[i + index]);
-      }
-
+    this.running[key] = Promise.resolve().then(() => {
       const classData: IDevApiClassData = {
-        demacia: this.libs[index],
-        index,
+        demacia: new Demacia(key, STRATEGY.SPREAD),
       };
 
-      return this.process(nameList, classData).catch((err) => {
+      return this.process(this.sharedData, classData).catch((err) => {
         if (err.response && err.response.status === 403) {
-          return this.expiredFunction(this.keys[index]);
+          return this.expiredFunction(key);
         } else {
           return Promise.reject(err);
         }
       });
     });
 
-    return this.running[index];
+    return this.running[key];
   }
 
-  public length() {
-    return this.keys.length;
-  }
-
-  public async runAll() {
+  public runAll(keys: string[]) {
     const promises = [];
-    for (let i = 0; i < this.keys.length; i++) {
-      promises.push(this.run(i)!);
+    for (let i = 0; i < keys.length; i++) {
+      promises.push(this.run(keys[i])!);
     }
-    return await Promise.all(promises);
+    
+    return Promise.all(promises).catch((err) => {
+      console.log('[CRITICAL ERROR!]');
+      console.log(err);
+      return Promise.reject(err);
+    });
   }
 }
 

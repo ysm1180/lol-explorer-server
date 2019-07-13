@@ -60,6 +60,9 @@ DevApi.find().then(async (data) => {
           console.log(`[${new Date().toTimeString()}] GET summoner ${nameList[index]}`);
           accountIdList.push(summoner.accountId);
         } catch (err) {
+          if (err.response && err.response.status === 403) {
+            return Promise.reject(err);
+          }
           if (err.response && err.response.status === 404) {
             console.log(`Summoner is not founded ${nameList[index]}`);
           }
@@ -80,6 +83,10 @@ DevApi.find().then(async (data) => {
             await analyzeGame(apiClassData.demacia, matchList[j].gameId);
           }
         } catch (err) {
+          if (err.response && err.response.status === 403) {
+            return Promise.reject(err);
+          }
+          
           if (err.response) {
             console.log(err.response.data);
           } else {

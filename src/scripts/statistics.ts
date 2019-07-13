@@ -20,6 +20,8 @@ router.post('/add/:key', async (req, res, next) => {
   const key = req.params.key;
   devApi.addKey(key);
   devApi.run(devApi.length() - 1);
+  console.log(`ADD KEY AND RERUN ${key}`);
+  res.send('OK');
 });
 
 app.use('/api', router);
@@ -86,7 +88,7 @@ DevApi.find().then(async (data) => {
           if (err.response && err.response.status === 403) {
             return Promise.reject(err);
           }
-          
+
           if (err.response) {
             console.log(err.response.data);
           } else {

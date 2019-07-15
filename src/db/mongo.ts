@@ -13,6 +13,7 @@ interface IMongoDBOptions {
 export class MongoDB {
   private url: string;
   private db = mongoose.connection;
+  private session: mongoose.ClientSession | null = null;
 
   constructor(options: IMongoDBOptions) {
     const { user, password, host, port, database } = options;
@@ -35,6 +36,29 @@ export class MongoDB {
     mongoose.connect(this.url, {
       useNewUrlParser: true,
     });
+  }
+
+  public async startSession() {
+    this.session = await this.db.startSession();
+    return this.session;
+  }
+
+  public startTransaction() {
+    if (this.session) {
+      this.session.startTransaction();
+    }
+  }
+
+  public async commitTransaction() {
+    if (this.session) {
+      await this.session.commitTransaction();
+    }
+  }
+
+  public async abortTransaction() {
+    if (this.session) {
+      await this.session.abortTransaction();
+    }
   }
 }
 

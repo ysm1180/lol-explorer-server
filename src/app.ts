@@ -29,6 +29,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/summoner', router.summonerRouter);
 app.use('/static', router.staticRouter);
+app.use('/statistics', router.statisticsRouter);
 
 app.use(function(
   err: createError.HttpError,

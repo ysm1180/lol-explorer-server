@@ -1,12 +1,19 @@
 {
-  "extends": ["tslint-config-prettier"],
-  "rulesDirectory": ["node_modules/tslint-microsoft-contrib/"],
+  "extends": [
+    "tslint-config-prettier"
+  ],
+  "rulesDirectory": [
+    "node_modules/tslint-microsoft-contrib/"
+  ],
   "rules": {
     "class-name": true,
     "jsdoc-format": true,
-    "member-ordering": [true, "static-before-instance"],
-    "no-unnecessary-class": true,
-    "promise-must-complete": true,
+    "member-ordering": [
+      true,
+      "static-before-instance"
+    ],
+    "no-unnecessary-class": false,
+    "promise-must-complete": false,
     "react-unused-props-and-state": [
       true,
       {
@@ -25,6 +32,9 @@
         "variable-declaration": "nospace"
       }
     ],
-    "variable-name": [true, "ban-keywords"]
+    "variable-name": [
+      true,
+      "ban-keywords"
+    ]
   }
 }

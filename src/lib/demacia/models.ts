@@ -1,3 +1,5 @@
+export type TeamId = 100 | 200;
+
 export interface ISummonerApiData {
   name: string;
   accountId: string;
@@ -13,7 +15,7 @@ export interface IMatchApiData {
 }
 
 export interface IGameTeamData {
-  teamId: number;
+  teamId: TeamId;
   win: string;
   firstBlood: boolean;
   firstTower: boolean;
@@ -36,7 +38,7 @@ export interface IGameTeamData {
 
 export interface IGameParticipantData {
   participantId: number;
-  teamId: number;
+  teamId: TeamId;
   championId: number;
   spell1Id: number;
   spell2Id: number;
@@ -50,7 +52,6 @@ export interface IGameParticipantData {
     item4: number;
     item5: number;
     item6: number;
-    items?: number[];
     kills: number;
     deaths: number;
     assists: number;
@@ -148,7 +149,7 @@ export interface IGameParticipantData {
   timeline: {
     participantId: number;
     role: string;
-    lane: string;
+    lane: 'TOP' | 'MID' | 'MIDDLE' | 'JUNGLE' | 'BOTTOM' | 'NONE';
   };
 }
 
@@ -178,6 +179,67 @@ export interface IGameApiData {
   gameVersion: string;
 }
 
+export interface IGameTimelineParticipantFrame {
+  [id: string]: {
+    participantId: number;
+    position: { x: number; y: number };
+    currentGold: number;
+    totalGold: number;
+    level: number;
+    xp: number;
+    minionsKilled: number;
+    jungleMinionsKilled: number;
+    dominionScore: number;
+    teamScore: number;
+  };
+}
+
+export interface IGameTimelineEvent {
+  type:
+    | 'CHAMPION_KILL'
+    | 'WARD_PLACED'
+    | 'WARD_KILL'
+    | 'BUILDING_KILL'
+    | 'ELITE_MONSTER_KILL'
+    | 'ITEM_PURCHASED'
+    | 'ITEM_SOLD'
+    | 'ITEM_DESTROYED'
+    | 'ITEM_UNDO'
+    | 'SKILL_LEVEL_UP'
+    | 'ASCENDED_EVENT'
+    | 'CAPTURE_POINT'
+    | 'PORO_KING_SUMMON';
+  timestamp: number;
+  participantId?: number;
+  skillSlot?: number;
+  levelUpType?: string;
+  itemId?: number;
+  killerId?: number;
+  victimId?: number;
+  assistingParticipantIds?: number[];
+  wardType?: string;
+  creatorId?: number;
+  afterId?: number;
+  beforeId?: number;
+  monsterType?: string;
+  monsterSubType?: string;
+  teamId?: TeamId;
+  buildingType?: string;
+  laneType?: string;
+  towerType?: string;
+}
+
+export interface IGameTimelineFrame {
+  participantFrames: IGameTimelineParticipantFrame;
+  events: IGameTimelineEvent[];
+  timestamp: number;
+}
+
+export interface IGameTimelineApiData {
+  frames: IGameTimelineFrame[];
+  frameInterval: number;
+}
+
 export interface ILeagueApiData {
   leagueId: string;
   queueType: string;
@@ -192,6 +254,26 @@ export interface ILeagueApiData {
   inactive: boolean;
   freshBlood: boolean;
   hotStreak: boolean;
-  season: number;
+  season?: number;
   miniSeries?: Object;
+}
+
+export interface ILeagueSummonerApiData {
+  tier: string;
+  leagueId: string;
+  queue: string;
+  name: string;
+  entries: {
+    summonerId: string;
+    summonerName: string;
+    leaguePoints: number;
+    rank: string;
+    wins: number;
+    losses: number;
+    veteran: boolean;
+    inactive: boolean;
+    freshBlood: boolean;
+    hotStreak: boolean;
+    miniSeries?: Object;
+  }[];
 }

@@ -4,7 +4,7 @@ import demacia from '../common/demacia';
 import { GAME_QUEUE_ID, MAP_ID } from '../lib/demacia/constants';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
-import GameChampion from '../models/game-champion';
+import GameChampion, { IGameChampionModel } from '../models/game-champion';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
 import { updateChampionAnalysisByGame } from '../models/util/game';
@@ -349,9 +349,27 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   }
 });
 
+function getRiftChampionClientData(gameChampion: IGameChampionModel) {
+  const champion: IRiftSummonerChampionClinetData = {} as any;
+  champion.key = gameChampion.championKey;
+  champion.wins = gameChampion.wins;
+  champion.losses = gameChampion.losses;
+  champion.averageKills = gameChampion.averageKills;
+  champion.averageDeaths = gameChampion.averageDeaths;
+  champion.averageAssists = gameChampion.averageAssists;
+  champion.averageCS = gameChampion.averageCS;
+  champion.averageEarnedGold = gameChampion.averageEarnedGold;
+  champion.averageGameDuration = gameChampion.averageGameDuration;
+  champion.doubleKills = gameChampion.doubleKills;
+  champion.tripleKills = gameChampion.tripleKills;
+  champion.quadraKills = gameChampion.quadraKills;
+  champion.pentaKills = gameChampion.pentaKills;
+  return champion;
+}
+
 function addRiftChampionClientData(
   _a: IRiftSummonerChampionClinetData,
-  b: IRiftSummonerChampionClinetData
+  b: IRiftSummonerChampionClinetData | IGameChampionModel
 ) {
   const a = lodash.cloneDeep(_a);
   a.wins += b.wins;
@@ -362,6 +380,10 @@ function addRiftChampionClientData(
   a.averageCS = (a.averageCS + b.averageCS) / 2;
   a.averageEarnedGold = (a.averageEarnedGold + b.averageEarnedGold) / 2;
   a.averageGameDuration = (a.averageGameDuration + b.averageGameDuration) / 2;
+  a.doubleKills += b.doubleKills;
+  a.tripleKills += b.tripleKills;
+  a.quadraKills += b.quadraKills;
+  a.pentaKills += b.pentaKills;
   return a;
 }
 
@@ -405,22 +427,22 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
           const champions = result.champions[gameChampion.championKey];
           champions.total = addRiftChampionClientData(champions.total, gameChampion);
           if (gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK) {
-            champions.solo = addRiftChampionClientData(champions.solo, gameChampion);
+            if (champions.solo) {
+              champions.solo = addRiftChampionClientData(champions.solo, gameChampion);
+            } else {
+              champions.solo = getRiftChampionClientData(gameChampion);
+            }
           } else {
-            champions.flex = addRiftChampionClientData(champions.flex, gameChampion);
+            if (champions.flex) {
+              champions.flex = addRiftChampionClientData(champions.flex, gameChampion);
+            } else {
+              champions.flex = getRiftChampionClientData(gameChampion);
+            }
           }
         }
       } else {
-        const champion: IRiftSummonerChampionClinetData = {} as any;
-        champion.key = gameChampion.championKey;
-        champion.wins = gameChampion.wins;
-        champion.losses = gameChampion.losses;
-        champion.averageKills = gameChampion.averageKills;
-        champion.averageDeaths = gameChampion.averageDeaths;
-        champion.averageAssists = gameChampion.averageAssists;
-        champion.averageCS = gameChampion.averageCS;
-        champion.averageEarnedGold = gameChampion.averageEarnedGold;
-        champion.averageGameDuration = gameChampion.averageGameDuration;
+        const champion = getRiftChampionClientData(gameChampion);
+
         if (
           gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK ||
           gameChampion.queueId === GAME_QUEUE_ID.RIFT_FLEX_RANK
@@ -429,9 +451,7 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
           result.champions[champion.key].total = champion;
           if (gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK) {
             result.champions[champion.key].solo = champion;
-            result.champions[champion.key].flex = {} as any;
           } else {
-            result.champions[champion.key].solo = {} as any;
             result.champions[champion.key].flex = champion;
           }
         }

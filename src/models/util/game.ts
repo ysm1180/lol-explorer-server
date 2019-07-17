@@ -184,6 +184,10 @@ export async function updateChampionAnalysisByGame(game: IGameModel) {
               participant.stats.totalMinionsKilled + participant.stats.neutralMinionsKilled,
             averageEarnedGold: participant.stats.goldEarned,
             averageGameDuration: game.gameDuration,
+            doubleKills: participant.stats.doubleKills,
+            tripleKills: participant.stats.tripleKills,
+            quadraKills: participant.stats.quadraKills,
+            pentaKills: participant.stats.pentaKills,
             predictPosition: positions[participant.participantId],
           });
 
@@ -206,6 +210,10 @@ export async function updateChampionAnalysisByGame(game: IGameModel) {
             (gameChampion.averageEarnedGold + participant.stats.goldEarned) / 2;
           gameChampion.averageGameDuration =
             (gameChampion.averageGameDuration + game.gameDuration) / 2;
+          gameChampion.doubleKills = participant.stats.doubleKills;
+          gameChampion.tripleKills = participant.stats.tripleKills;
+          gameChampion.quadraKills = participant.stats.quadraKills;
+          gameChampion.pentaKills = participant.stats.pentaKills;
 
           await gameChampion.save();
         }

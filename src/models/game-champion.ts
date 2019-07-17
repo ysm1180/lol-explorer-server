@@ -16,6 +16,10 @@ export interface IGameChampionModel extends Document {
   averageCS: number;
   averageEarnedGold: number;
   averageGameDuration: number;
+  doubleKills: number;
+  tripleKills: number;
+  quadraKills: number;
+  pentaKills: number;
   predictPosition: Position;
 }
 
@@ -35,6 +39,10 @@ var gameChampionSchema = new Schema({
   averageCS: Number,
   averageEarnedGold: Number,
   averageGameDuration: Number,
+  doubleKills: Number,
+  tripleKills: Number,
+  quadraKills: Number,
+  pentaKills: Number,
   predictPosition: Number,
 });
 

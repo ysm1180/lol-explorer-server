@@ -42,24 +42,26 @@ export function getPositionDataByTeam(game: IGameModel) {
     const participantId = game.participantIdentities[i].participantId;
     const participantData = game.participants.find(
       (participant) => participant.participantId === participantId
-    )!;
-    const teamId = participantData.teamId;
-    if (!result[teamId]) {
-      result[teamId] = [];
-    }
+    );
+    if (participantData) {
+      const teamId = participantData.teamId;
+      if (!result[teamId]) {
+        result[teamId] = [];
+      }
 
-    const { lane, role } = participantData.timeline;
-    const { item0, item1, item2, item3, item4, item5, item6 } = participantData.stats;
-    const position = getFixedPosition(lane, role);
-    result[teamId].push({
-      lane,
-      role,
-      participantId,
-      position,
-      championId: participantData.championId,
-      spells: [participantData.spell1Id, participantData.spell2Id],
-      items: [item0, item1, item2, item3, item4, item5, item6],
-    });
+      const { lane, role } = participantData.timeline;
+      const { item0, item1, item2, item3, item4, item5, item6 } = participantData.stats;
+      const position = getFixedPosition(lane, role);
+      result[teamId].push({
+        lane,
+        role,
+        participantId,
+        position,
+        championId: participantData.championId,
+        spells: [participantData.spell1Id, participantData.spell2Id],
+        items: [item0, item1, item2, item3, item4, item5, item6],
+      });
+    }
   }
 
   return result;

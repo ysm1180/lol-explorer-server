@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
@@ -289,6 +289,7 @@ function downloadStaticDataFiles(version: string, dest: string) {
       done: () => void,
       fail: (err: any) => void
     ) => void;
+    trasnform?: (data: AxiosResponse<any>) => AxiosResponse<any>;
   }[] = [
     {
       downloadFileName: 'champion_all.json',
@@ -327,6 +328,63 @@ function downloadStaticDataFiles(version: string, dest: string) {
     {
       downloadFileName: 'perk_all.json',
       downloadUrl: DDragonHelper.URL_STATIC_PERKS_DATA(version),
+      trasnform: (response) => {
+        const data = response.data;
+        data.push({
+          id: 5000,
+          key: 'stats',
+          slots: [
+            {
+              runes: [
+                {
+                  id: 5001,
+                  key: 'HealthScaling',
+                  name: '체력 (레벨에 비례)',
+                  shortDesc: '체력 +15~90',
+                  icon: 'perk-images/StatMods/StatModsHealthScalingIcon.png',
+                },
+                {
+                  id: 5002,
+                  key: 'Armor',
+                  name: '방어력',
+                  shortDesc: '방어력 +6',
+                  icon: 'perk-images/StatMods/StatModsArmorIcon.png',
+                },
+                {
+                  id: 5003,
+                  key: 'MagicRes',
+                  name: '마법 저항력',
+                  shortDesc: '마법 저항력 +8',
+                  icon: 'perk-images/StatMods/StatModsMagicResIcon.png',
+                },
+                {
+                  id: 5005,
+                  key: 'AttackSpeed',
+                  name: '공격속도',
+                  shortDesc: '공격속도 +10%',
+                  icon: 'perk-images/StatMods/StatModsAttackSpeedIcon.png',
+                },
+                {
+                  id: 5007,
+                  key: 'CDRScaling',
+                  name: '재사용 대기시간 감소 (레벨에 비례)',
+                  shortDesc: '재사용 대기시간 감소 +1~10%',
+                  icon: 'perk-images/StatMods/StatModsCDRScalingIcon.png',
+                },
+                {
+                  id: 5008,
+                  key: 'Adaptive',
+                  name: '적응형 능력치',
+                  shortDesc: '공격력 + 6 or 주문력 + 10',
+                  icon: 'perk-images/StatMods/StatModsAdaptiveForceIcon.png',
+                },
+              ],
+            },
+          ],
+        });
+        response.data = data;
+        return response;
+      },
     },
     {
       downloadFileName: 'patch.json',
@@ -346,6 +404,16 @@ function downloadStaticDataFiles(version: string, dest: string) {
         axios
           .get(info.downloadUrl)
           .then((response) => {
+            if (info.trasnform) {
+              console.log('transform');
+              return info.trasnform(response);
+            }
+            return response;
+          })
+          .then((response) => {
+            if (info.downloadFileName === 'perk_all.json') {
+              console.log(JSON.stringify(response.data));
+            }
             fs.writeFileSync(downloadFilePath, JSON.stringify(response.data));
             console.log(`[${info.downloadFileName}] Written.`);
 

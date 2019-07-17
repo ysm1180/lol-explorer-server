@@ -1,7 +1,7 @@
 import * as express from 'express';
 import * as lodash from 'lodash';
 import demacia from '../common/demacia';
-import { MAP_ID } from '../lib/demacia/constants';
+import { GAME_QUEUE_ID, MAP_ID } from '../lib/demacia/constants';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import Game, { IGameModel } from '../models/game';
 import GameChampion from '../models/game-champion';
@@ -121,12 +121,22 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
     const count = Number(req.params.count);
 
     if (count < 1) {
-      res.status(400).json({ message: 'Cannot get less than 1.' });
+      res.status(400).json({
+        status: {
+          message: 'Cannot get less than 1.',
+          status_code: 400,
+        },
+      });
       return;
     }
 
     if (count > 100) {
-      res.status(400).json({ message: 'Cannot get more than 100.' });
+      res.status(400).json({
+        status: {
+          message: 'Cannot get more than 100.',
+          status_code: 400,
+        },
+      });
       return;
     }
 
@@ -155,7 +165,12 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
         matchList.push(...docs.ops);
       }
     } else if (items.length > count) {
-      res.status(400).json({ message: 'Bad match list count.' });
+      res.status(400).json({
+        status: {
+          message: 'Bad match list count.',
+          status_code: 400,
+        },
+      });
       return;
     }
 
@@ -357,7 +372,12 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
 
     const lastSeason = await DDragonHelper.getLatestSeason();
     if (seasonId > lastSeason) {
-      res.status(400).json({ message: 'Invalid season id' });
+      res.status(400).json({
+        status: {
+          message: 'Invalid season id',
+          status_code: 400,
+        },
+      });
       return;
     }
 
@@ -378,10 +398,13 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
       const gameChampion = gameChampions[i];
 
       if (result.champions[gameChampion.championKey]) {
-        if (gameChampion.queueId === 420 || gameChampion.queueId === 440) {
+        if (
+          gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK ||
+          gameChampion.queueId === GAME_QUEUE_ID.RIFT_FLEX_RANK
+        ) {
           const champions = result.champions[gameChampion.championKey];
           champions.total = addRiftChampionClientData(champions.total, gameChampion);
-          if (gameChampion.queueId === 420) {
+          if (gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK) {
             champions.solo = addRiftChampionClientData(champions.solo, gameChampion);
           } else {
             champions.flex = addRiftChampionClientData(champions.flex, gameChampion);
@@ -398,10 +421,13 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
         champion.averageCS = gameChampion.averageCS;
         champion.averageEarnedGold = gameChampion.averageEarnedGold;
         champion.averageGameDuration = gameChampion.averageGameDuration;
-        if (gameChampion.queueId === 420 || gameChampion.queueId === 440) {
+        if (
+          gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK ||
+          gameChampion.queueId === GAME_QUEUE_ID.RIFT_FLEX_RANK
+        ) {
           result.champions[champion.key] = {} as any;
           result.champions[champion.key].total = champion;
-          if (gameChampion.queueId === 420) {
+          if (gameChampion.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK) {
             result.champions[champion.key].solo = champion;
             result.champions[champion.key].flex = {} as any;
           } else {
@@ -415,6 +441,14 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
     const matchList = await Match.find({
       summonerAccountId: req.params.accountId,
       season: seasonId,
+      $or: [
+        {
+          queue: GAME_QUEUE_ID.RIFT_SOLO_RANK,
+        },
+        {
+          queue: GAME_QUEUE_ID.RIFT_FLEX_RANK,
+        },
+      ],
     });
     const gameIds = matchList.map((match) => match.gameId);
     const savedGames = await Game.find().in('gameId', gameIds);

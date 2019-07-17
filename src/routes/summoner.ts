@@ -411,9 +411,13 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
 
     const result: {
       totalGames: number;
+      soloGames: number;
+      flexGames: number;
       champions: { [id: string]: IRiftGamesChampionClinetData };
     } = {
       totalGames: 0,
+      soloGames: 0,
+      flexGames: 0,
       champions: {} as any,
     };
     for (let i = 0; i < gameChampions.length; i++) {
@@ -458,22 +462,24 @@ router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next
       }
     }
 
-    const matchList = await Match.find({
+    const soloMatchList = await Match.find({
       summonerAccountId: req.params.accountId,
       season: seasonId,
-      $or: [
-        {
-          queue: GAME_QUEUE_ID.RIFT_SOLO_RANK,
-        },
-        {
-          queue: GAME_QUEUE_ID.RIFT_FLEX_RANK,
-        },
-      ],
+      queue: GAME_QUEUE_ID.RIFT_SOLO_RANK,
     });
-    const gameIds = matchList.map((match) => match.gameId);
-    const savedGames = await Game.find().in('gameId', gameIds);
+    const flexMatchList = await Match.find({
+      summonerAccountId: req.params.accountId,
+      season: seasonId,
+      queue: GAME_QUEUE_ID.RIFT_FLEX_RANK,
+    });
+    const soloRankGameIds = soloMatchList.map((match) => match.gameId);
+    const flexRankGameIds = flexMatchList.map((match) => match.gameId);
+    const soloSavedGames = await Game.find().in('gameId', soloRankGameIds);
+    const flexSavedGames = await Game.find().in('gameId', flexRankGameIds);
 
-    result.totalGames = savedGames.length;
+    result.totalGames = soloSavedGames.length + flexSavedGames.length;
+    result.soloGames = soloSavedGames.length;
+    result.flexGames = flexSavedGames.length;
 
     res.json(result);
   } catch (err) {

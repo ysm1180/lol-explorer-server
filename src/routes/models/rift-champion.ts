@@ -1,5 +1,5 @@
 export interface IRiftSummonerChampionClinetData {
-  key?: number;
+  key: number;
   queueId: number;
   mapId: number;
   wins: number;
@@ -10,6 +10,10 @@ export interface IRiftSummonerChampionClinetData {
   averageCS: number;
   averageEarnedGold: number;
   averageGameDuration: number;
+  doubleKills: number;
+  tripleKills: number;
+  quadraKills: number;
+  pentaKills: number;
 }
 
 export interface IRiftGamesChampionClinetData {

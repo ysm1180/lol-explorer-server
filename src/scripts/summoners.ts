@@ -103,7 +103,7 @@ DevApi.find().then(async (data) => {
             queue,
             tier,
             rank,
-            page: 0,
+            page: 1,
           });
         }
       }
@@ -132,26 +132,30 @@ DevApi.find().then(async (data) => {
 
         let pageData = sharedData.pageData.filter((data: { page: number }) => data.page !== -1);
         while (pageData.length > 0) {
-          const idx = Math.floor(Math.random() * pageData.length);
-          const randomData = pageData[idx];
-          if (randomData.page !== -1) {
-            const result = await getSummonerList(
-              randomData.queue,
-              randomData.tier,
-              randomData.rank,
-              randomData.page++,
-              apiClassData.demacia
-            );
-            if (result.length === 0) {
-              randomData.page = -1;
-            } else {
-              console.log(
-                `${randomData.queue} ${randomData.tier} ${randomData.rank} ${randomData.page}`
+          try {
+            const idx = Math.floor(Math.random() * pageData.length);
+            const randomData = pageData[idx];
+            if (randomData.page !== -1) {
+              const result = await getSummonerList(
+                randomData.queue,
+                randomData.tier,
+                randomData.rank,
+                randomData.page++,
+                apiClassData.demacia
               );
-              await StatisticsSummoner.insertMany(result);
+              if (result.length === 0) {
+                randomData.page = -1;
+              } else {
+                console.log(
+                  `${randomData.queue} ${randomData.tier} ${randomData.rank} ${randomData.page}`
+                );
+                await StatisticsSummoner.insertMany(result);
+              }
             }
+          } catch (err) {
+            console.log(err);
           }
-
+          
           pageData = sharedData.pageData.filter((data: { page: number }) => data.page !== -1);
         }
 

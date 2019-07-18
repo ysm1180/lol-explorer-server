@@ -3,6 +3,7 @@ import * as lodash from 'lodash';
 import demacia from '../common/demacia';
 import { GAME_QUEUE_ID, MAP_ID } from '../lib/demacia/constants';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
+import { IMatchApiData } from '../lib/demacia/models';
 import Game, { IGameModel } from '../models/game';
 import GameChampion, { IGameChampionModel } from '../models/game-champion';
 import Match from '../models/match';
@@ -115,6 +116,14 @@ router.post('/:name', async function(req, res, next) {
   }
 });
 
+router.get('/matches/test/:accountId', async function(req, res, next) {
+  try {
+    res.json(await getMatchListExactly(req.params.accountId, 0, 100));
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   try {
     const start = Number(req.params.start);
@@ -140,26 +149,100 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
       return;
     }
 
-    const items = await Match.find({
+    const items = (await Match.find({
       summonerAccountId: req.params.accountId,
     })
       .sort({ timestamp: -1 })
       .skip(start)
-      .limit(count);
+      .limit(count)
+      .lean()) as IMatchApiData[];
 
-    let matchList = items.map((item) => item.toObject());
+    let matchList = items;
 
     if (items.length === 0) {
-      const insertMatchDataList = await getMatchListExactly(req.params.accountId, start, 100);
+      const docsCount = await Match.countDocuments();
+      let timestamp = -1;
+      if (docsCount !== 0 && start > 0) {
+        const maxTimestampRows = await Match.aggregate([
+          {
+            $match: {
+              summonerAccountId: req.params.accountId,
+            },
+          },
+          {
+            $sort: {
+              timestamp: -1,
+            },
+          },
+          {
+            $limit: 1,
+          },
+          {
+            $project: {
+              timestamp: 1,
+            },
+          },
+        ]);
+        if (maxTimestampRows.length === 0) {
+          res.status(404).json({
+            status: {
+              message: 'Not matched max timestamp.',
+              status_code: 404,
+            },
+          });
+          return;
+        }
+
+        timestamp = maxTimestampRows[0].timestamp;
+      }
+
+      const insertMatchDataList = await getMatchListExactly(
+        req.params.accountId,
+        start,
+        100,
+        timestamp
+      );
       const docs = await Match.collection.insertMany(insertMatchDataList);
       matchList = docs.ops;
       matchList = matchList.slice(0, count);
     } else if (items.length < count) {
+      const maxTimestampRows = await Match.aggregate([
+        {
+          $match: {
+            summonerAccountId: req.params.accountId,
+          },
+        },
+        {
+          $sort: {
+            timestamp: -1,
+          },
+        },
+        {
+          $limit: 1,
+        },
+        {
+          $project: {
+            timestamp: 1,
+          },
+        },
+      ]);
+      if (maxTimestampRows.length === 0) {
+        res.status(404).json({
+          status: {
+            message: 'Not matched max timestamp.',
+            status_code: 404,
+          },
+        });
+        return;
+      }
+
+      const maxTimestamp = maxTimestampRows[0].timestamp;
       if (!items[items.length - 1].first) {
         const insertMatchDataList = await getMatchListExactly(
           req.params.accountId,
           start,
-          count - items.length
+          count - items.length,
+          maxTimestamp
         );
         const docs = await Match.collection.insertMany(insertMatchDataList);
         matchList.push(...docs.ops);

@@ -273,17 +273,19 @@ export class RateLimiter {
     reject: (reason?: any) => void,
     isReschedule: boolean = false
   ) {
+    if (isReschedule) {
+      this.queue.unshift({ fn, resolve, reject });
+    } else {
+      this.queue.push({ fn, resolve, reject });
+    }
+
     if (
       (this.isStrategySpread() && !this.intervalNextSpreadExecution) ||
       (this.isStrategyBurst() && !this.intervalProcessQueue)
     ) {
       this.refresh();
     }
-    if (isReschedule) {
-      this.queue.unshift({ fn, resolve, reject });
-    } else {
-      this.queue.push({ fn, resolve, reject });
-    }
+    
     return this.queue;
   }
 
@@ -389,6 +391,8 @@ export class RateLimiter {
           .then(resolve)
           .catch(reject);
       });
+    } else {
+
     }
   }
 

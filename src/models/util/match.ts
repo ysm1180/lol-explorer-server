@@ -1,7 +1,12 @@
 import demacia from '../../common/demacia';
 import Match from '../match';
 
-async function getMatchListToBeInserted(accountId: string, start: number, count: number) {
+export async function getMatchListToBeInserted(
+  accountId: string,
+  start: number,
+  count: number,
+  timestamp: number
+) {
   const data = await demacia.getMatchListByAccountId(accountId, start, start + 100);
   const matchListData = data.matches;
   if (matchListData.length === 0) {
@@ -16,13 +21,21 @@ async function getMatchListToBeInserted(accountId: string, start: number, count:
 
   let insertMatchDataList = [];
   for (var i = 0; i < matchListData.length; i++) {
-    const matchData = await Match.find({
-      summonerAccountId: accountId,
-      gameId: matchListData[i].gameId,
-    }).limit(1);
-    if (matchData.length === 0) {
-      matchListData[i].summonerAccountId = accountId;
-      insertMatchDataList.push(matchListData[i]);
+    if (timestamp === -1 || (timestamp !== -1 && matchListData[i].timestamp < timestamp)) {
+      let matchData = [];
+      matchData = await Match.find({
+        summonerAccountId: accountId,
+        gameId: matchListData[i].gameId,
+      }).limit(1);
+
+      if (matchData.length === 0) {
+        matchListData[i].summonerAccountId = accountId;
+        insertMatchDataList.push(matchListData[i]);
+      }
+    }
+
+    if (insertMatchDataList.length >= count) {
+      break;
     }
   }
 
@@ -38,9 +51,19 @@ async function getMatchListToBeInserted(accountId: string, start: number, count:
   return { wantCount, list: insertMatchDataList };
 }
 
-export async function getMatchListExactly(accountId: string, start: number, count: number) {
+export async function getMatchListExactly(
+  accountId: string,
+  start: number,
+  count: number,
+  lastTimestamp: number = -1
+) {
   try {
-    const insertMatchDataList = await getMatchListToBeInserted(accountId, start, count);
+    const insertMatchDataList = await getMatchListToBeInserted(
+      accountId,
+      start,
+      count,
+      lastTimestamp
+    );
 
     if (insertMatchDataList.wantCount === insertMatchDataList.list.length) {
       return Promise.resolve(insertMatchDataList.list);
@@ -51,10 +74,12 @@ export async function getMatchListExactly(accountId: string, start: number, coun
       let i = 100;
       let totalCount = list.length;
       while (totalCount < count) {
+        console.log('next');
         let nextInsertMatchList = await getMatchListToBeInserted(
           accountId,
           start + i,
-          start + i + 100
+          count,
+          lastTimestamp
         );
 
         if (nextInsertMatchList.wantCount === 0) {
@@ -83,10 +108,16 @@ export async function getMatchListRecentlyAll(accountId: string) {
     const resultList = [];
 
     let i = 0;
+    const fiexdCount = 100;
     while (true) {
-      const matchList = await getMatchListExactly(accountId, i, 100);
-      resultList.push(...matchList);
-      if (matchList.length < 100) {
+      const insertMatchDataList = await getMatchListToBeInserted(accountId, i, fiexdCount, -1);
+
+      resultList.push(...insertMatchDataList.list);
+      if (
+        insertMatchDataList.list.length < fiexdCount ||
+        (insertMatchDataList.wantCount !== fiexdCount &&
+          insertMatchDataList.wantCount === insertMatchDataList.list.length)
+      ) {
         break;
       }
       i += 100;

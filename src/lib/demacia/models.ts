@@ -8,10 +8,11 @@ export interface ISummonerApiData {
 }
 
 export interface IMatchApiData {
-  summonerAccountId: string;
+  summonerAccountId?: string;
   gameId: number;
   champion: number;
-  first: boolean;
+  timestamp: number;
+  first?: boolean;
 }
 
 export interface IGameTeamData {

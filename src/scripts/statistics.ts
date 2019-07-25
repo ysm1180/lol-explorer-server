@@ -6,6 +6,7 @@ import { Demacia } from '../lib/demacia/demacia';
 import GameTimeline from '../models/game-timeline';
 import DevApi from '../models/statistics/api';
 import StatisticsChampion from '../models/statistics/champion';
+import StatisticsChampionPosition from '../models/statistics/champion_position';
 import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
@@ -20,7 +21,7 @@ router.post('/add/:key', async (req, res, next) => {
   const key = req.params.key;
   console.log(`RUN PROCESS ${key}`);
   devApi.run(key);
-  
+
   res.send('OK');
 });
 
@@ -28,8 +29,11 @@ app.use('/api', router);
 
 const summonerList = async () => {
   const summoners = await StatisticsSummoner.find({
-    $or: [{ tier: 'CHALLENGER' }, { tier: 'GRANDMASTER' }, { tier: 'MASTER' }],
-  }).select({ name: 1 });
+    $or: [{ tier: 'PLATINUM' }, { tier: 'DIAMOND' }, { tier: 'MASTER' }],
+  })
+    .lean()
+    .limit(50000)
+    .select({ name: 1 });
   const result = [];
 
   for (let i = 0; i < summoners.length; i++) {
@@ -167,34 +171,51 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
               }
             }
 
-            const gameId = game.gameId;
-            const isWin = participantData.stats.win;
-            const teamId = teamData.teamId;
-            const championKey = participantData.championId;
-            const spell1 = participantData.spell1Id;
-            const spell2 = participantData.spell2Id;
-            const stats = participantData.stats;
-            const participantTimeline = participantData.timeline;
-            const gameMinutes = Math.floor(game.gameDuration / 60);
-            const skills = getSkillSlotEvents(timeline, participantId);
-            const items = getPurchasedItemEvents(timeline, participantId);
-            const position = positions[participantId];
+            if (
+              tier === 'PLATINUM' ||
+              tier === 'DIAMOND' ||
+              tier === 'MASTER' ||
+              tier === 'GRANDMASTER' ||
+              tier === 'CHALLENGER'
+            ) {
+              const gameId = game.gameId;
+              const isWin = participantData.stats.win;
+              const teamId = teamData.teamId;
+              const championKey = participantData.championId;
+              const spell1 = participantData.spell1Id;
+              const spell2 = participantData.spell2Id;
+              const stats = participantData.stats;
+              const participantTimeline = participantData.timeline;
+              const gameMinutes = Math.floor(game.gameDuration / 60);
+              const skills = getSkillSlotEvents(timeline, participantId);
+              const items = getPurchasedItemEvents(timeline, participantId);
+              const position = positions[participantId];
 
-            champions.push({
-              gameId,
-              isWin,
-              championKey,
-              tier,
-              spell1,
-              spell2,
-              teamId,
-              stats,
-              timeline: participantTimeline,
-              durationMinutes: gameMinutes,
-              skills,
-              items,
-              position,
-            });
+              champions.push({
+                gameId,
+                isWin,
+                championKey,
+                tier,
+                spell1,
+                spell2,
+                teamId,
+                stats,
+                timeline: participantTimeline,
+                durationMinutes: gameMinutes,
+                skills,
+                items,
+                position,
+              });
+
+              const count = await StatisticsChampionPosition.findOne({ championKey, position });
+              if (count) {
+                count.count++;
+                if (isWin) {
+                  count.win++;
+                }
+                count.save();
+              }
+            }
           } catch (err) {
             if (err.response && err.response.status === 404) {
               continue;

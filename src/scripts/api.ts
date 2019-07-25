@@ -5,6 +5,7 @@ type ExpiredFunction = (key: string) => Promise<void>;
 type ProcessFunction = (dataArray: any[], classData: IDevApiClassData) => Promise<void>;
 export interface IDevApiClassData {
   demacia: Demacia;
+  key: string;
 }
 
 export class LolStatisticsWrapper {
@@ -39,6 +40,7 @@ export class LolStatisticsWrapper {
     this.running[key] = Promise.resolve().then(() => {
       const classData: IDevApiClassData = {
         demacia: new Demacia(key, STRATEGY.SPREAD),
+        key,
       };
 
       return this.process(this.sharedData, classData).catch((err) => {

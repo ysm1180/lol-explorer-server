@@ -88,7 +88,7 @@ DevApi.find().then(async (data) => {
                 .matches;
               for (let j = 0; j < matchList.length; j++) {
                 console.log(
-                  `[${new Date().toLocaleTimeString('ko-KR')}] Analyze ${matchList[j].gameId}`
+                  `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.key} Analyze ${matchList[j].gameId}`
                 );
                 await analyzeGame(apiClassData.demacia, matchList[j].gameId);
               }

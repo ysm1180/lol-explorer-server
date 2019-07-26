@@ -242,7 +242,7 @@ async function saveChampionBans({
       championBan.count += championCount[championKey];
       championBan.save();
     } else {
-      new StatisticsChampionRune({
+      await new StatisticsChampionBan({
         championKey,
         gameVersion,
         count: championCount[championKey],
@@ -293,7 +293,7 @@ async function saveChampionRune({
     }
     rune.save();
   } else {
-    new StatisticsChampionRune({
+    await new StatisticsChampionRune({
       championKey,
       position,
       tier,
@@ -338,7 +338,7 @@ async function saveChampionSkillSet({
     }
     skillset.save();
   } else {
-    new StatisticsChampionSkillSet({
+    await new StatisticsChampionSkillSet({
       championKey,
       position,
       tier,
@@ -379,7 +379,7 @@ async function saveChampionPurchasedItems({
     }
     item.save();
   } else {
-    new StatisticsChampionPurchasedItem({
+    await new StatisticsChampionPurchasedItem({
       championKey,
       position,
       tier,
@@ -420,7 +420,7 @@ async function saveChampionSpell({
     }
     spell.save();
   } else {
-    new StatisticsChampionSpell({
+    await new StatisticsChampionSpell({
       championKey,
       position,
       tier,
@@ -461,7 +461,7 @@ async function saveChampionStartItem({
     }
     startItem.save();
   } else {
-    new StatisticsChampionStartItem({
+    await new StatisticsChampionStartItem({
       championKey,
       position,
       tier,
@@ -676,6 +676,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                 .filter((item) => item.timestamp <= 60000)
                 .map((item) => item.itemId)
                 .sort((a, b) => a - b);
+
 
               await Promise.all([
                 saveChampionTimeWin({

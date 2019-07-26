@@ -153,6 +153,9 @@ DevApi.find().then(async (data) => {
               }
             }
           } catch (err) {
+            if (err.response && err.response.status === 403) {
+              return Promise.reject(err);
+            }
             console.log(err);
           }
           

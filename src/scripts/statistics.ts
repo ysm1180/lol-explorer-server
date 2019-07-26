@@ -100,7 +100,7 @@ DevApi.find().then(async (data) => {
         console.log(`Expired function error ${err}`);
       }
     });
-    devApi.setSharedData(await summonerList([], 50000));
+    devApi.setSharedData(await summonerList([], 1000));
     devApi.setProcessFunction(
       async (sharedData: { name: string; selected: boolean }[], apiClassData: IDevApiClassData) => {
         let unselectedList = sharedData.filter((data) => !data.selected);
@@ -148,7 +148,7 @@ DevApi.find().then(async (data) => {
             unselectedList = sharedData.filter((data) => !data.selected);
           }
 
-          const newSummonerList = await summonerList(sharedData.map((data) => data.name), 50000);
+          const newSummonerList = await summonerList(sharedData.map((data) => data.name), 1000);
           if (newSummonerList.length === 0) {
             break;
           }
@@ -192,7 +192,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       const temp = version.split('.');
       return `${temp[0]}.${temp[1]}`;
     };
-    if (getGameVersion(game.gameVersion) !== '9.14') {
+    if (getGameVersion(game.gameVersion) !== '9.14' && getGameVersion(game.gameVersion) !== '9.13') {
       return Promise.resolve(false);
     }
 

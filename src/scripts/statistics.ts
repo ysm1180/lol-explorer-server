@@ -3,15 +3,23 @@ import * as express from 'express';
 import mongo from '../db/mongo';
 import { GAME_QUEUE_ID, LEAGUE_QUEUE_TYPE, MAP_ID, POSITION } from '../lib/demacia/constants';
 import { Demacia } from '../lib/demacia/demacia';
+import { IGameParticipantData } from '../lib/demacia/models';
 import GameTimeline from '../models/game-timeline';
 import DevApi from '../models/statistics/api';
 import StatisticsChampion from '../models/statistics/champion';
+import StatisticsChampionBan from '../models/statistics/champion_ban';
 import StatisticsChampionPosition from '../models/statistics/champion_position';
+import StatisticsChampionPurchasedItem from '../models/statistics/champion_purchased_item';
+import StatisticsChampionRune from '../models/statistics/champion_rune';
+import StatisticsChampionSkillSet from '../models/statistics/champion_skill_set';
+import StatisticsChampionSpell from '../models/statistics/champion_spell';
 import StatisticsChampionStartItem from '../models/statistics/champion_start_item';
+import StatisticsChampionTimeWin from '../models/statistics/champion_time_win';
 import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
-import { getPurchasedItemEvents, getSkillSlotEvents } from '../models/util/timeline';
+import { getCombinedStaticItemIdList, getConsumedStaticItemIdList } from '../models/util/static';
+import { getItemEvents, getSkillLevelupSlots } from '../models/util/timeline';
 import devApi, { IDevApiClassData } from './api';
 
 const app = express();
@@ -171,38 +179,417 @@ DevApi.find().then(async (data) => {
 var port = process.env.PORT || 6666;
 app.listen(port);
 
+async function saveChampionRival({
+  championKey,
+  rivalData,
+}: {
+  championKey: number;
+  rivalData: IGameParticipantData;
+}) {}
+
+async function saveChampionTimeWin({
+  championKey,
+  position,
+  gameVersion,
+  gameMinutes,
+  isWin,
+}: {
+  championKey: number;
+  position: number;
+  gameVersion: string;
+  gameMinutes: number;
+  isWin: boolean;
+}) {
+  const count = await StatisticsChampionTimeWin.findOne({
+    championKey,
+    position,
+    gameVersion,
+    gameMinutes,
+  });
+  if (count) {
+    count.count++;
+    if (isWin) {
+      count.win++;
+    }
+    count.save();
+  } else {
+    await new StatisticsChampionTimeWin({
+      championKey,
+      position,
+      gameMinutes,
+      gameVersion,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+async function saveChampionBans({
+  totalBannedChampions,
+  gameVersion,
+}: {
+  totalBannedChampions: number[];
+  gameVersion: string;
+}) {
+  const championCount: { [id: string]: number } = {};
+  for (const championId of totalBannedChampions) {
+    if (!championCount[championId]) {
+      championCount[championId] = 1;
+    } else {
+      championCount[championId]++;
+    }
+  }
+
+  for (const championKey of Object.keys(championCount)) {
+    const championBan = await StatisticsChampionBan.findOne({
+      championKey,
+      gameVersion,
+    });
+    if (championBan) {
+      championBan.countByGame++;
+      championBan.count += championCount[championKey];
+      championBan.save();
+    } else {
+      new StatisticsChampionRune({
+        championKey,
+        gameVersion,
+        count: championCount[championKey],
+        countByGame: 1,
+      }).save();
+    }
+  }
+}
+
+async function saveChampionRune({
+  championKey,
+  tier,
+  position,
+  gameVersion,
+  isWin,
+  mainRuneStyle,
+  mainRunes,
+  subRuneStyle,
+  subRunes,
+  statRunes,
+}: {
+  championKey: number;
+  tier: string;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  mainRuneStyle: number;
+  mainRunes: number[];
+  subRuneStyle: number;
+  subRunes: number[];
+  statRunes: number[];
+}) {
+  const skillset = await StatisticsChampionRune.findOne({
+    championKey,
+    position,
+    tier,
+    gameVersion,
+    mainRuneStyle,
+    mainRunes,
+    subRuneStyle,
+    subRunes,
+    statRunes,
+  });
+  if (skillset) {
+    skillset.count++;
+    if (isWin) {
+      skillset.win++;
+    }
+    skillset.save();
+  } else {
+    new StatisticsChampionRune({
+      championKey,
+      position,
+      tier,
+      gameVersion,
+      mainRuneStyle,
+      mainRunes,
+      subRuneStyle,
+      subRunes,
+      statRunes,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+async function saveChampionSkillSet({
+  championKey,
+  tier,
+  position,
+  gameVersion,
+  isWin,
+  skills,
+}: {
+  championKey: number;
+  tier: string;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  skills: number[];
+}) {
+  const skillset = await StatisticsChampionSkillSet.findOne({
+    championKey,
+    position,
+    tier,
+    gameVersion,
+    skills,
+  });
+  if (skillset) {
+    skillset.count++;
+    if (isWin) {
+      skillset.win++;
+    }
+    skillset.save();
+  } else {
+    new StatisticsChampionSkillSet({
+      championKey,
+      position,
+      tier,
+      gameVersion,
+      skills,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+async function saveChampionPurchasedItems({
+  championKey,
+  tier,
+  position,
+  gameVersion,
+  isWin,
+  items,
+}: {
+  championKey: number;
+  tier: string;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  items: number[];
+}) {
+  const item = await StatisticsChampionPurchasedItem.findOne({
+    championKey,
+    position,
+    tier,
+    gameVersion,
+    items,
+  });
+  if (item) {
+    item.count++;
+    if (isWin) {
+      item.win++;
+    }
+    item.save();
+  } else {
+    new StatisticsChampionPurchasedItem({
+      championKey,
+      position,
+      tier,
+      gameVersion,
+      items,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+async function saveChampionSpell({
+  championKey,
+  tier,
+  position,
+  gameVersion,
+  isWin,
+  spells,
+}: {
+  championKey: number;
+  tier: string;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  spells: number[];
+}) {
+  const spell = await StatisticsChampionSpell.findOne({
+    championKey,
+    position,
+    tier,
+    gameVersion,
+    spells,
+  });
+  if (spell) {
+    spell.count++;
+    if (isWin) {
+      spell.win++;
+    }
+    spell.save();
+  } else {
+    new StatisticsChampionSpell({
+      championKey,
+      position,
+      tier,
+      gameVersion,
+      spells,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+async function saveChampionStartItem({
+  championKey,
+  tier,
+  position,
+  gameVersion,
+  isWin,
+  items,
+}: {
+  championKey: number;
+  tier: string;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  items: number[];
+}) {
+  const startItem = await StatisticsChampionStartItem.findOne({
+    championKey,
+    position,
+    tier,
+    gameVersion,
+    items,
+  });
+  if (startItem) {
+    startItem.count++;
+    if (isWin) {
+      startItem.win++;
+    }
+    startItem.save();
+  } else {
+    new StatisticsChampionStartItem({
+      championKey,
+      position,
+      tier,
+      gameVersion,
+      items,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+async function saveChampionPosition({
+  championKey,
+  tier,
+  position,
+  gameVersion,
+  isWin,
+}: {
+  championKey: number;
+  tier: string;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+}) {
+  const count = await StatisticsChampionPosition.findOne({
+    championKey,
+    position,
+    tier,
+    gameVersion,
+  });
+  if (count) {
+    count.count++;
+    if (isWin) {
+      count.win++;
+    }
+    count.save();
+  } else {
+    await new StatisticsChampionPosition({
+      championKey,
+      position,
+      tier,
+      gameVersion,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
 export async function analyzeGame(demacia: Demacia, gameId: number) {
   try {
     let game = await StatisticsGame.findOne({ gameId });
     if (!game) {
       const gameData = await demacia.getMatchInfoByGameId(gameId);
       game = new StatisticsGame(gameData);
-      game.isAnalyze = [false, false, false, false, false, false, false, false, false, false];
-      await game.save();
     }
 
     let timeline = await GameTimeline.findOne({ gameId });
     if (!timeline) {
       const timelineData = await demacia.getMatchTimelineByGameId(gameId);
       timeline = new GameTimeline({ ...timelineData, gameId });
-      await timeline.save();
     }
 
     const getGameVersion = (version: string) => {
       const temp = version.split('.');
       return `${temp[0]}.${temp[1]}`;
     };
-    if (getGameVersion(game.gameVersion) !== '9.14' && getGameVersion(game.gameVersion) !== '9.13') {
+    const gameVersion = getGameVersion(game.gameVersion);
+
+    if (gameVersion !== '9.14' && gameVersion !== '9.13' && gameVersion !== '9.12') {
       return Promise.resolve(false);
     }
 
     if (
       game.mapId == MAP_ID.SUMMONER_RIFT &&
       (game.queueId === GAME_QUEUE_ID.RIFT_SOLO_RANK ||
-        game.queueId === GAME_QUEUE_ID.RIFT_FLEX_RANK)
+        game.queueId === GAME_QUEUE_ID.RIFT_FLEX_RANK) &&
+      !(game.gameDuration <= 60 * 5 && !game.teams[0].firstBlood && !game.teams[1].firstBlood)
     ) {
+      const consumedItemList = await getConsumedStaticItemIdList();
+      const combinedItemList = await getCombinedStaticItemIdList();
+
+      game.isAnalyze = [false, false, false, false, false, false, false, false, false, false];
+      await timeline.save();
+
       const positions = getPositions(game);
       const champions = [];
+      const teams = game.teams;
+
+      const totalBannedChampions = [];
+      for (const team of teams) {
+        totalBannedChampions.push(...team.bans.map((ban) => ban.championId));
+      }
+      await saveChampionBans({ totalBannedChampions, gameVersion });
+
+      const rivals: { [id: string]: IGameParticipantData } = {};
+      for (let i = 0; i < game.participantIdentities.length; i++) {
+        const participantId = game.participantIdentities[i].participantId;
+        const participantData = game.participants.find(
+          (participant) => participant.participantId === participantId
+        )!;
+
+        for (let j = 0; j < game.participantIdentities.length; j++) {
+          if (i === j) {
+            continue;
+          }
+
+          const rivalParticipantId = game.participantIdentities[j].participantId;
+          const rivalParticipantData = game.participants.find(
+            (participant) => participant.participantId === rivalParticipantId
+          )!;
+          if (participantData.teamId === rivalParticipantData.teamId) {
+            continue;
+          }
+
+          if (positions[participantId] !== positions[rivalParticipantId]) {
+            continue;
+          }
+
+          rivals[participantId] = rivalParticipantData;
+        }
+      }
 
       for (let i = 0; i < game.participantIdentities.length; i++) {
         const summonerData = game.participantIdentities[i].player;
@@ -213,7 +600,6 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
             const summonerLeagueApiData = await demacia.getLeagueBySummonerId(summoner.id);
 
             game.isAnalyze[participantId] = true;
-            await game.save();
 
             const participantData = game.participants.find(
               (participant) => participant.participantId === participantId
@@ -238,95 +624,135 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
               const isWin = participantData.stats.win;
               const teamId = teamData.teamId;
               const championKey = participantData.championId;
-              const spell1 = participantData.spell1Id;
-              const spell2 = participantData.spell2Id;
               const stats = participantData.stats;
+              const spells = [participantData.spell1Id, participantData.spell2Id].sort(
+                (a, b) => a - b
+              );
+              const mainRuneStyle = stats.perkPrimaryStyle;
+              const mainRunes = [stats.perk0, stats.perk1, stats.perk2, stats.perk3];
+              const subRuneStyle = stats.perkSubStyle;
+              const subRunes = [stats.perk4, stats.perk5];
+              const statRunes = [stats.statPerk0, stats.statPerk1, stats.statPerk2];
               const participantTimeline = participantData.timeline;
               const gameMinutes = Math.floor(game.gameDuration / 60);
-              const skills = getSkillSlotEvents(timeline, participantId);
-              const items = getPurchasedItemEvents(timeline, participantId);
+              const skills = getSkillLevelupSlots(timeline, participantId);
+              const items = getItemEvents(timeline, participantId).sort(
+                (a, b) => a.timestamp - b.timestamp
+              );
               const position = positions[participantId];
-              const gameVersion = getGameVersion(game.gameVersion);
+
+              const purchasedItemIds = [];
+              for (const item of items) {
+                if (item.type === 'ITEM_PURCHASED') {
+                  if (
+                    !consumedItemList.includes(item.itemId) &&
+                    combinedItemList.includes(item.itemId)
+                  ) {
+                    purchasedItemIds.push(item.itemId);
+                  }
+                } else if (item.type === 'ITEM_UNDO') {
+                  const index = purchasedItemIds.indexOf(item.itemId);
+                  if (index !== -1) {
+                    purchasedItemIds.splice(index, 1);
+                  }
+                }
+              }
 
               champions.push({
                 gameId,
                 isWin,
                 championKey,
                 tier,
-                spell1,
-                spell2,
+                participantId,
                 teamId,
                 stats,
                 timeline: participantTimeline,
                 durationMinutes: gameMinutes,
-                skills,
-                items,
+                gameVersion,
                 position,
+                rivalData: rivals[participantId],
               });
-
               const startItemIds = items
                 .filter((item) => item.timestamp <= 60000)
                 .map((item) => item.itemId)
                 .sort((a, b) => a - b);
 
-              const startItem = await StatisticsChampionStartItem.findOne({
-                championKey,
-                position,
-                tier,
-                gameVersion,
-                items: startItemIds,
-              });
-              if (startItem) {
-                startItem.count++;
-                if (isWin) {
-                  startItem.win++;
-                }
-                startItem.save();
-              } else {
-                new StatisticsChampionStartItem({
+              await Promise.all([
+                saveChampionTimeWin({
                   championKey,
                   position,
-                  tier,
+                  gameMinutes,
                   gameVersion,
+                  isWin,
+                }),
+                saveChampionStartItem({
+                  championKey,
+                  tier,
+                  position,
+                  gameVersion,
+                  isWin,
                   items: startItemIds,
-                  count: 1,
-                  win: isWin ? 1 : 0,
-                }).save();
-              }
-
-              const count = await StatisticsChampionPosition.findOne({
-                championKey,
-                position,
-                tier,
-                gameVersion,
-              });
-              if (count) {
-                count.count++;
-                if (isWin) {
-                  count.win++;
-                }
-                count.save();
-              } else {
-                new StatisticsChampionPosition({
+                }),
+                saveChampionPosition({
                   championKey,
-                  position,
                   tier,
+                  position,
                   gameVersion,
-                  count: 1,
-                  win: isWin ? 1 : 0,
-                }).save();
+                  isWin,
+                }),
+                saveChampionSpell({
+                  championKey,
+                  tier,
+                  position,
+                  gameVersion,
+                  isWin,
+                  spells,
+                }),
+                saveChampionPurchasedItems({
+                  championKey,
+                  tier,
+                  position,
+                  gameVersion,
+                  isWin,
+                  items: purchasedItemIds,
+                }),
+                saveChampionRune({
+                  championKey,
+                  tier,
+                  position,
+                  gameVersion,
+                  isWin,
+                  mainRuneStyle,
+                  mainRunes,
+                  subRuneStyle,
+                  subRunes,
+                  statRunes,
+                }),
+              ]);
+              if (skills.length >= 15) {
+                await saveChampionSkillSet({
+                  championKey,
+                  tier,
+                  position,
+                  gameVersion,
+                  isWin,
+                  skills,
+                });
               }
             }
           } catch (err) {
-            if (err.response && err.response.status === 404) {
-              continue;
+            console.error(`[GAME PARTICIPANT ${participantId} ANALYZE ERROR]`);
+            if (err.response) {
+              console.log(err.response.data);
             } else {
-              throw err;
+              console.log(err);
             }
+            game.isAnalyze[participantId] = false;
           }
         }
       }
 
+      await game.save();
       await StatisticsChampion.insertMany(champions);
     }
 

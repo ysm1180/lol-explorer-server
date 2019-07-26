@@ -1,6 +1,7 @@
 import Champion from '../static/champion';
 import Item from '../static/item';
 import Spell from '../static/spell';
+import { DDragonHelper } from '../../lib/demacia/data-dragon/ddragon-helper';
 
 export async function registerStaticChamionList(champions: { [id: string]: string }) {
   for (const championId in champions) {
@@ -43,4 +44,30 @@ export async function registerStaticSpellList(spells: any) {
   }
 
   console.log(`[Mongo] Finish spells.`);
+}
+
+export async function getConsumedStaticItemIdList() {
+  const items = await Item.find();
+  const version = await DDragonHelper.getLatestVersion();
+  const result = [];
+  for (let i = 0; i < items.length; i++) {
+    const rawData = await DDragonHelper.getItemData(version, items[i].key);
+    if (rawData.consumed) {
+      result.push(items[i].key);
+    }
+  }
+  return result;
+}
+
+export async function getCombinedStaticItemIdList() {
+  const items = await Item.find();
+  const version = await DDragonHelper.getLatestVersion();
+  const result = [];
+  for (let i = 0; i < items.length; i++) {
+    const rawData = await DDragonHelper.getItemData(version, items[i].key);
+    if (rawData.from && rawData.from.length > 0) {
+      result.push(items[i].key);
+    }
+  }
+  return result;
 }

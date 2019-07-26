@@ -8,31 +8,9 @@ export interface IChampionStatisticsModel extends Document {
   isWin: boolean;
   durationMinutes: number;
   position: POSITION;
-  spell1: number;
-  spell2: number;
   teamId: number;
-  stats: {
-    mainPerkStyle: number;
-    mainPerk0: number;
-    mainPerk1: number;
-    mainPerk2: number;
-    mainPerk3: number;
-    subPerkStyle: number;
-    subPerk0: number;
-    subPerk1: number;
-    statPerk0: number;
-    statPerk1: number;
-    statPerk2: number;
-  };
+  participantId: number;
   timeline: any;
-  skills: {
-    skillSlot: number;
-    timestamp: number;
-  }[];
-  items: {
-    itemId: number;
-    timestamp: number;
-  }[];
 }
 
 var championStatisticsSchema = new Schema({
@@ -42,21 +20,18 @@ var championStatisticsSchema = new Schema({
   isWin: Boolean,
   durationMinutes: Number,
   position: Number,
-  spell1: Number,
-  spell2: Number,
   teamId: Number,
+  participantId: Number,
   stats: {
     type: ['Mixed'],
   },
   timeline: {
     type: ['Mixed'],
   },
-  skills: {
+  rivalData: {
     type: ['Mixed'],
   },
-  items: {
-    type: ['Mixed'],
-  },
+  gameVersion: String,
 });
 
 export default model<IChampionStatisticsModel>('statistics_champion', championStatisticsSchema);

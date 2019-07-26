@@ -1,12 +1,19 @@
 import { IGameTimelineApiData } from '../../lib/demacia/models';
 
-export function getPurchasedItemEvents(timeline: IGameTimelineApiData, participantId: number) {
+export function getItemEvents(timeline: IGameTimelineApiData, participantId: number) {
   const result = [];
   for (let i = 0; i < timeline.frames.length; i++) {
     const events = timeline.frames[i].events;
     for (let j = 0; j < events.length; j++) {
-      if (events[j].type === 'ITEM_PURCHASED' && events[j].participantId === participantId) {
+      if (
+        (events[j].type === 'ITEM_PURCHASED' ||
+          events[j].type === 'ITEM_SOLD' ||
+          events[j].type === 'ITEM_UNDO' ||
+          events[j].type === 'ITEM_DESTROYED') &&
+        events[j].participantId === participantId
+      ) {
         result.push({
+          type: events[j].type,
           itemId: events[j].itemId!,
           timestamp: events[j].timestamp,
         });
@@ -17,16 +24,13 @@ export function getPurchasedItemEvents(timeline: IGameTimelineApiData, participa
   return result;
 }
 
-export function getSkillSlotEvents(timeline: IGameTimelineApiData, participantId: number) {
+export function getSkillLevelupSlots(timeline: IGameTimelineApiData, participantId: number) {
   const result = [];
   for (let i = 0; i < timeline.frames.length; i++) {
     const events = timeline.frames[i].events;
     for (let j = 0; j < events.length; j++) {
       if (events[j].type === 'SKILL_LEVEL_UP' && events[j].participantId === participantId) {
-        result.push({
-          skillSlot: events[j].skillSlot!,
-          timestamp: events[j].timestamp,
-        });
+        result.push(events[j].skillSlot!);
       }
     }
   }

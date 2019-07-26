@@ -97,8 +97,10 @@ export async function getPlayRateByRole(championId: number) {
     totalCount += data[i].count;
   }
 
-  for (let i = 0; i < data.length; i++) {
-    playRate[data[i]._id] = data[i].count / totalCount;
+  if (totalCount > 1000) {
+    for (let i = 0; i < data.length; i++) {
+      playRate[data[i]._id] = data[i].count / totalCount;
+    }
   }
 
   return playRate;
@@ -141,20 +143,20 @@ async function getRoles(
     };
   } else {
     bestRoles = {
-      [POSITION.TOP]: champions[0],
-      [POSITION.JUNGLE]: champions[1],
-      [POSITION.MID]: champions[2],
-      [POSITION.ADC]: champions[3],
-      [POSITION.SUPPORT]: champions[4],
+      [POSITION.TOP]: fixed.top || 0,
+      [POSITION.JUNGLE]: fixed.jungle || 0,
+      [POSITION.MID]: fixed.mid || 0,
+      [POSITION.ADC]: fixed.adc || 0,
+      [POSITION.SUPPORT]: fixed.support || 0,
     };
-    let bestPlayPercents = {
-      [champions[0]]: championRoles[champions[0]][POSITION.TOP],
-      [champions[1]]: championRoles[champions[1]][POSITION.JUNGLE],
-      [champions[2]]: championRoles[champions[2]][POSITION.MID],
-      [champions[3]]: championRoles[champions[3]][POSITION.ADC],
-      [champions[4]]: championRoles[champions[4]][POSITION.SUPPORT],
-    };
-    let bestMetric = Object.values(bestPlayPercents).reduce((prev, cur) => prev + cur, 0) / 5;
+    const bestPlayPercents = [
+      championRoles[fixed.top || 0][POSITION.TOP] || 0,
+      championRoles[fixed.jungle || 0][POSITION.JUNGLE] || 0,
+      championRoles[fixed.mid || 0][POSITION.MID] || 0,
+      championRoles[fixed.adc || 0][POSITION.ADC] || 0,
+      championRoles[fixed.support || 0][POSITION.SUPPORT] || 0,
+    ];
+    let bestMetric = bestPlayPercents.reduce((prev, cur) => prev + cur, 0) / 5;
     const championPermutation = permuteAll(champions, []);
     for (let i = 0; i < championPermutation.length; i++) {
       const _champions = championPermutation[i];
@@ -175,28 +177,28 @@ async function getRoles(
       }
 
       const percents = [
-        championRoles[_champions[0]][POSITION.TOP],
-        championRoles[_champions[1]][POSITION.JUNGLE],
-        championRoles[_champions[2]][POSITION.MID],
-        championRoles[_champions[3]][POSITION.ADC],
-        championRoles[_champions[4]][POSITION.SUPPORT],
+        championRoles[_champions[0]][POSITION.TOP] || 0,
+        championRoles[_champions[1]][POSITION.JUNGLE] || 0,
+        championRoles[_champions[2]][POSITION.MID] || 0,
+        championRoles[_champions[3]][POSITION.ADC] || 0,
+        championRoles[_champions[4]][POSITION.SUPPORT] || 0,
       ];
       const metric = percents.reduce((prev, cur) => prev + cur, 0) / 5;
       if (metric > bestMetric) {
         bestMetric = metric;
+
+        const top = championRoles[_champions[0]][POSITION.TOP] ? _champions[0] : 0;
+        const jungle = championRoles[_champions[1]][POSITION.JUNGLE] ? _champions[1] : 0;
+        const mid = championRoles[_champions[2]][POSITION.MID] ? _champions[2] : 0;
+        const adc = championRoles[_champions[3]][POSITION.ADC] ? _champions[3] : 0;
+        const support = championRoles[_champions[4]][POSITION.SUPPORT] ? _champions[4] : 0;
+
         bestRoles = {
-          [POSITION.TOP]: _champions[0],
-          [POSITION.JUNGLE]: _champions[1],
-          [POSITION.MID]: _champions[2],
-          [POSITION.ADC]: _champions[3],
-          [POSITION.SUPPORT]: _champions[4],
-        };
-        bestPlayPercents = {
-          [_champions[0]]: championRoles[_champions[0]][POSITION.TOP],
-          [_champions[1]]: championRoles[_champions[1]][POSITION.JUNGLE],
-          [_champions[2]]: championRoles[_champions[2]][POSITION.MID],
-          [_champions[3]]: championRoles[_champions[3]][POSITION.ADC],
-          [_champions[4]]: championRoles[_champions[4]][POSITION.SUPPORT],
+          [POSITION.TOP]: top,
+          [POSITION.JUNGLE]: jungle,
+          [POSITION.MID]: mid,
+          [POSITION.ADC]: adc,
+          [POSITION.SUPPORT]: support,
         };
       }
     }
@@ -209,7 +211,7 @@ export async function predictPosition(
   positions: IParticipantPositionData[],
   fixedPositions: { [position: string]: number }
 ) {
-  const championRoles: { [id: string]: { [position: string]: number } } = {};
+  const championRoles: { [id: string]: { [position: string]: number } } = { 0: {} };
   for (const data of positions) {
     const championPlayRate = await getPlayRateByRole(data.championId);
     if (!Object.values(fixedPositions).includes(data.championId)) {
@@ -292,7 +294,9 @@ export async function getPredictPositions(game: IGameModel) {
 
     const bestPosition = await predictPosition(positions, fixedPostion);
     for (let i = 0; i < positions.length; i++) {
-      positions[i].position = bestPosition[positions[i].participantId];
+      if (bestPosition[positions[i].participantId]) {
+        positions[i].position = bestPosition[positions[i].participantId];
+      }
     }
   }
 

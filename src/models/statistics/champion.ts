@@ -6,7 +6,6 @@ export interface IChampionStatisticsModel extends Document {
   championKey: number;
   tier: string;
   isWin: boolean;
-  durationMinutes: number;
   position: POSITION;
   teamId: number;
   participantId: number;
@@ -18,18 +17,17 @@ var championStatisticsSchema = new Schema({
   championKey: Number,
   tier: String,
   isWin: Boolean,
-  durationMinutes: Number,
   position: Number,
   teamId: Number,
   participantId: Number,
   stats: {
-    type: ['Mixed'],
+    type: 'Mixed',
   },
   timeline: {
-    type: ['Mixed'],
+    type: 'Mixed',
   },
   rivalData: {
-    type: ['Mixed'],
+    type: 'Mixed',
   },
   gameVersion: String,
 });

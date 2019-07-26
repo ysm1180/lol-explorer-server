@@ -19,7 +19,11 @@ import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
 import { getCombinedStaticItemIdList, getConsumedStaticItemIdList } from '../models/util/static';
-import { getItemEvents, getSkillLevelupSlots } from '../models/util/timeline';
+import {
+  getItemEvents,
+  getPurchasedItemEvents,
+  getSkillLevelupSlots,
+} from '../models/util/timeline';
 import devApi, { IDevApiClassData } from './api';
 
 const app = express();
@@ -633,6 +637,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
               );
               const position = positions[participantId];
 
+              const totalPurchasedItemEvent = [];
               const purchasedItemIds = [];
               for (const item of items) {
                 if (item.type === 'ITEM_PURCHASED') {
@@ -642,10 +647,18 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                   ) {
                     purchasedItemIds.push(item.itemId);
                   }
+                  totalPurchasedItemEvent.push(item);
                 } else if (item.type === 'ITEM_UNDO') {
-                  const index = purchasedItemIds.indexOf(item.itemId);
+                  let index = purchasedItemIds.indexOf(item.itemId);
                   if (index !== -1) {
                     purchasedItemIds.splice(index, 1);
+                  }
+
+                  index = totalPurchasedItemEvent.findIndex(
+                    (event) => event.itemId === item.itemId
+                  );
+                  if (index !== -1) {
+                    totalPurchasedItemEvent.splice(index, 1);
                   }
                 }
               }
@@ -659,12 +672,11 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                 teamId,
                 stats,
                 timeline: participantTimeline,
-                durationMinutes: gameMinutes,
                 gameVersion,
                 position,
                 rivalData: rivals[participantId],
               });
-              const startItemIds = items
+              const startItemIds = totalPurchasedItemEvent
                 .filter((item) => item.timestamp <= 60000)
                 .map((item) => item.itemId)
                 .sort((a, b) => a - b);

@@ -19,11 +19,7 @@ import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
 import { getCombinedStaticItemIdList, getConsumedStaticItemIdList } from '../models/util/static';
-import {
-  getItemEvents,
-  getPurchasedItemEvents,
-  getSkillLevelupSlots,
-} from '../models/util/timeline';
+import { getItemEvents, getSkillLevelupSlots } from '../models/util/timeline';
 import devApi, { IDevApiClassData } from './api';
 
 const app = express();
@@ -279,7 +275,7 @@ async function saveChampionRune({
   subRunes: number[];
   statRunes: number[];
 }) {
-  const skillset = await StatisticsChampionRune.findOne({
+  const rune = await StatisticsChampionRune.findOne({
     championKey,
     position,
     tier,
@@ -290,12 +286,12 @@ async function saveChampionRune({
     subRunes,
     statRunes,
   });
-  if (skillset) {
-    skillset.count++;
+  if (rune) {
+    rune.count++;
     if (isWin) {
-      skillset.win++;
+      rune.win++;
     }
-    skillset.save();
+    rune.save();
   } else {
     new StatisticsChampionRune({
       championKey,

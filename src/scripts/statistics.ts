@@ -179,14 +179,6 @@ DevApi.find().then(async (data) => {
 var port = process.env.PORT || 6666;
 app.listen(port);
 
-async function saveChampionRival({
-  championKey,
-  rivalData,
-}: {
-  championKey: number;
-  rivalData: IGameParticipantData;
-}) {}
-
 async function saveChampionTimeWin({
   championKey,
   position,

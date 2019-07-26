@@ -737,7 +737,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                   position,
                   gameVersion,
                   isWin,
-                  skills,
+                  skills: skills.slice(0, 15),
                 });
               }
             }

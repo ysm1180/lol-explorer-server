@@ -7,7 +7,7 @@ export function getPurchasedItemEvents(timeline: IGameTimelineApiData, participa
     for (let j = 0; j < events.length; j++) {
       if (events[j].type === 'ITEM_PURCHASED' && events[j].participantId === participantId) {
         result.push({
-          itemId: events[j].itemId,
+          itemId: events[j].itemId!,
           timestamp: events[j].timestamp,
         });
       }

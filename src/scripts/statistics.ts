@@ -7,6 +7,7 @@ import GameTimeline from '../models/game-timeline';
 import DevApi from '../models/statistics/api';
 import StatisticsChampion from '../models/statistics/champion';
 import StatisticsChampionPosition from '../models/statistics/champion_position';
+import StatisticsChampionStartItem from '../models/statistics/champion_start_item';
 import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
@@ -27,20 +28,48 @@ router.post('/add/:key', async (req, res, next) => {
 
 app.use('/api', router);
 
-const summonerList = async () => {
-  const summoners = await StatisticsSummoner.find({
-    $or: [{ tier: 'PLATINUM' }, { tier: 'DIAMOND' }, { tier: 'MASTER' }],
-  })
-    .lean()
-    .limit(50000)
-    .select({ name: 1 });
+const summonerList = async (prev: string[], size: number) => {
+  const summoners = await StatisticsSummoner.aggregate([
+    {
+      $match: {
+        $and: [
+          {
+            $or: [
+              { tier: 'PLATINUM' },
+              { tier: 'DIAMOND' },
+              { tier: 'MASTER' },
+              { tier: 'GRANDMASTER' },
+              { tier: 'CHALLENGER' },
+            ],
+          },
+          {
+            name: {
+              $nin: prev,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $sample: {
+        size,
+      },
+    },
+    {
+      $project: {
+        name: 1,
+      },
+    },
+  ]);
   const result = [];
 
   for (let i = 0; i < summoners.length; i++) {
-    result.push({
-      name: summoners[i].name,
-      selected: false,
-    });
+    if (!prev.includes(summoners[i].name)) {
+      result.push({
+        name: summoners[i].name,
+        selected: false,
+      });
+    }
   }
 
   return [...new Set(result)];
@@ -71,41 +100,60 @@ DevApi.find().then(async (data) => {
         console.log(`Expired function error ${err}`);
       }
     });
-    devApi.setSharedData(await summonerList());
+    devApi.setSharedData(await summonerList([], 50000));
     devApi.setProcessFunction(
       async (sharedData: { name: string; selected: boolean }[], apiClassData: IDevApiClassData) => {
         let unselectedList = sharedData.filter((data) => !data.selected);
 
-        while (unselectedList.length > 0) {
-          const idx = Math.floor(Math.random() * unselectedList.length);
-          if (!unselectedList[idx].selected) {
-            try {
-              unselectedList[idx].selected = true;
+        const totalCount = await StatisticsSummoner.countDocuments();
+        let count = 0;
 
-              const name = unselectedList[idx].name;
-              const accountId = await getSummonerAccountId(apiClassData.demacia, name);
-              const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountId))
-                .matches;
-              for (let j = 0; j < matchList.length; j++) {
-                console.log(
-                  `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.key} Analyze ${matchList[j].gameId}`
-                );
-                await analyzeGame(apiClassData.demacia, matchList[j].gameId);
-              }
-            } catch (err) {
-              if (err.response && err.response.status === 403) {
-                unselectedList[idx].selected = false;
-                return Promise.reject(err);
-              }
+        while (count < totalCount) {
+          while (unselectedList.length > 0) {
+            const idx = Math.floor(Math.random() * unselectedList.length);
+            if (!unselectedList[idx].selected) {
+              try {
+                unselectedList[idx].selected = true;
+                count++;
 
-              if (err.response) {
-                console.error(err.response.data);
-              } else {
-                console.error(err);
+                const name = unselectedList[idx].name;
+                const accountId = await getSummonerAccountId(apiClassData.demacia, name);
+                const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountId))
+                  .matches;
+                for (let j = 0; j < matchList.length; j++) {
+                  console.log(
+                    `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.key} Analyze ${
+                      matchList[j].gameId
+                    }`
+                  );
+                  const result = await analyzeGame(apiClassData.demacia, matchList[j].gameId);
+                  if (!result) {
+                    break;
+                  }
+                }
+              } catch (err) {
+                if (err.response && err.response.status === 403) {
+                  unselectedList[idx].selected = false;
+                  return Promise.reject(err);
+                }
+
+                if (err.response) {
+                  console.error(err.response.data);
+                } else {
+                  console.error(err);
+                }
               }
             }
+
+            unselectedList = sharedData.filter((data) => !data.selected);
           }
 
+          const newSummonerList = await summonerList(sharedData.map((data) => data.name), 50000);
+          if (newSummonerList.length === 0) {
+            break;
+          }
+          sharedData.push(...newSummonerList);
+          console.log(`NEW ADD ${newSummonerList.length}`);
           unselectedList = sharedData.filter((data) => !data.selected);
         }
 
@@ -138,6 +186,14 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       const timelineData = await demacia.getMatchTimelineByGameId(gameId);
       timeline = new GameTimeline({ ...timelineData, gameId });
       await timeline.save();
+    }
+
+    const getGameVersion = (version: string) => {
+      const temp = version.split('.');
+      return `${temp[0]}.${temp[1]}`;
+    };
+    if (getGameVersion(game.gameVersion) !== '9.14') {
+      return Promise.resolve(false);
     }
 
     if (
@@ -190,6 +246,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
               const skills = getSkillSlotEvents(timeline, participantId);
               const items = getPurchasedItemEvents(timeline, participantId);
               const position = positions[participantId];
+              const gameVersion = getGameVersion(game.gameVersion);
 
               champions.push({
                 gameId,
@@ -207,13 +264,57 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                 position,
               });
 
-              const count = await StatisticsChampionPosition.findOne({ championKey, position });
+              const startItemIds = items
+                .filter((item) => item.timestamp <= 60000)
+                .map((item) => item.itemId)
+                .sort((a, b) => a - b);
+
+              const startItem = await StatisticsChampionStartItem.findOne({
+                championKey,
+                position,
+                tier,
+                gameVersion,
+                items: startItemIds,
+              });
+              if (startItem) {
+                startItem.count++;
+                if (isWin) {
+                  startItem.win++;
+                }
+                startItem.save();
+              } else {
+                new StatisticsChampionStartItem({
+                  championKey,
+                  position,
+                  tier,
+                  gameVersion,
+                  items: startItemIds,
+                  count: 1,
+                  win: isWin ? 1 : 0,
+                }).save();
+              }
+
+              const count = await StatisticsChampionPosition.findOne({
+                championKey,
+                position,
+                tier,
+                gameVersion,
+              });
               if (count) {
                 count.count++;
                 if (isWin) {
                   count.win++;
                 }
                 count.save();
+              } else {
+                new StatisticsChampionPosition({
+                  championKey,
+                  position,
+                  tier,
+                  gameVersion,
+                  count: 1,
+                  win: isWin ? 1 : 0,
+                }).save();
               }
             }
           } catch (err) {
@@ -229,7 +330,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       await StatisticsChampion.insertMany(champions);
     }
 
-    return Promise.resolve();
+    return Promise.resolve(true);
   } catch (err) {
     console.error('[GAME ANALYZE ERROR]');
     if (err.response) {

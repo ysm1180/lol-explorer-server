@@ -9,29 +9,9 @@ import StatisticsChampion from '../models/statistics/champion';
 import StatisticsGame, { IStatisticsGameModel } from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
-import {
-  getConsumedStaticItemIdList,
-  getFinalStaticItemIdList,
-  getShoesStaticItemIdList,
-} from '../models/util/static';
-import {
-  saveChampionBans,
-  saveChampionPosition,
-  saveChampionPurchasedItems,
-  saveChampionRivalData,
-  saveChampionRune,
-  saveChampionShoes,
-  saveChampionSkillSet,
-  saveChampionSpell,
-  saveChampionStartItem,
-  saveChampionTimeWin,
-} from '../models/util/statistics';
-import {
-  getItemEvents,
-  getSkillLevelupSlots,
-  getSoloKills,
-  getStartItemIdList,
-} from '../models/util/timeline';
+import { getConsumedStaticItemIdList, getFinalStaticItemIdList, getShoesStaticItemIdList } from '../models/util/static';
+import { saveChampionBans, saveChampionPosition, saveChampionPurchasedItems, saveChampionRivalData, saveChampionRune, saveChampionShoes, saveChampionSkillSet, saveChampionSpell, saveChampionStartItem, saveChampionTimeWin } from '../models/util/statistics';
+import { getItemEvents, getSkillLevelupSlots, getSoloKills, getStartItemIdList } from '../models/util/timeline';
 import devApi, { IDevApiClassData } from './api';
 
 const app = express();
@@ -80,6 +60,15 @@ const gameList = async (size: number) => {
   return [...new Set(result)];
 };
 
+const sleep = (ms: number) => {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+};
+
+let isFinished = false;
+let lock = false;
+
 console.log('Clean UP');
 DevApi.find().then(async (data) => {
   try {
@@ -93,7 +82,14 @@ DevApi.find().then(async (data) => {
         console.log(`Expired function error ${err}`);
       }
     });
-    devApi.setSharedData(await gameList(200));
+
+    const initData = await gameList(200);
+    if (initData.length === 0) {
+      console.log('END');
+      return;
+    }
+
+    devApi.setSharedData(initData);
     devApi.setProcessFunction(
       async (
         sharedData: { game: IStatisticsGameModel; selected: boolean }[],
@@ -132,14 +128,35 @@ DevApi.find().then(async (data) => {
             unselectedList = sharedData.filter((data) => !data.selected);
           }
 
+          while (lock) {
+            console.log(`${apiClassData.key} LOCKED`);
+            await sleep(2000);
+          }
+          console.log(`${apiClassData.key} UNLOCKED`);
+
+          if (isFinished) {
+            console.log(`${apiClassData.key} FINISHED`);
+            break;
+          }
+
+          unselectedList = sharedData.filter((data) => !data.selected);
+          if (unselectedList.length > 0) {
+            continue;
+          }
+
+          lock = true;
           const newGameList = await gameList(200);
           if (newGameList.length === 0) {
+            console.log(`${apiClassData.key} FINISHED`);
+            isFinished = true;
+            lock = false;
             break;
           }
           sharedData.splice(0, sharedData.length);
           sharedData.push(...newGameList);
           console.log(`NEW ADD GAME ${newGameList.length}`);
           unselectedList = sharedData.filter((data) => !data.selected);
+          lock = false;
         }
 
         console.log('END');

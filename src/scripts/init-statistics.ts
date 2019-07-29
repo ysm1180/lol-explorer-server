@@ -27,6 +27,7 @@ mongo.on('open', (db) => {
   });
 
   promises.push(db.collection('statistics_games').updateMany({}, { $set: { isReady: false } }));
+  promises.push(db.collection('statistics_summoners').updateMany({}, { $set: { isReady: false } }));
 
   Promise.all(promises).then(() => {
     console.log('Init DB Finish.');

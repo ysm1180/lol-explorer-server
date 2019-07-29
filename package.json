@@ -11,7 +11,7 @@
     "test": "cross-env NODE_ENV=test nyc mocha -r ts-node/register ./test/*.spec.ts --exit",
     "script:summoner": "ts-node ./src/scripts/summoners.ts",
     "script:statistics": "ts-node ./src/scripts/statistics.ts",
-    "script:cleanup": "ts-node ./src/scripts/cleanup.ts",
+    "script:reorg": "ts-node ./src/scripts/reorganization.ts",
     "init:statistics": "ts-node ./src/scripts/init-statistics.ts"
 
   },

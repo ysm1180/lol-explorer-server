@@ -18,6 +18,7 @@ export interface IStatisticsChampionRivalStatModel extends Document {
   averageDamageDealtToChampions: number;
   averageDamageTaken: number;
   averageGoldEarned: number;
+  averageKillPercent: number;
 }
 
 var statisticsChampionRivalStatSchema = new Schema({
@@ -37,6 +38,7 @@ var statisticsChampionRivalStatSchema = new Schema({
   averageDamageDealtToChampions: Number,
   averageDamageTaken: Number,
   averageGoldEarned: Number,
+  averageKillPercent: Number,
 });
 
 export default model<IStatisticsChampionRivalStatModel>(

@@ -71,3 +71,39 @@ export async function getCombinedStaticItemIdList() {
   }
   return result;
 }
+
+export async function getFinalStaticItemIdList() {
+  const items = await Item.find();
+  const version = await DDragonHelper.getLatestVersion();
+  const result = [];
+  for (let i = 0; i < items.length; i++) {
+    const rawData = await DDragonHelper.getItemData(version, items[i].key);
+    if (rawData.from && rawData.from.length > 0) {
+      if (rawData.into && rawData.into.length === 1) {
+        const intoRawData = await DDragonHelper.getItemData(version, Number(rawData.into[0]));
+        if (intoRawData.requiredAlly) {
+          result.push(items[i].key);
+        }
+      } else if (!rawData.into) {
+        result.push(items[i].key);
+      }
+    }
+  }
+  return result;
+}
+
+export async function getShoesStaticItemIdList() {
+  const items = await Item.find();
+  const version = await DDragonHelper.getLatestVersion();
+  const result = [];
+  for (let i = 0; i < items.length; i++) {
+    const rawData = await DDragonHelper.getItemData(version, items[i].key);
+    if (rawData.from && rawData.from.length > 0) {
+      if (rawData.from.includes('1001')) {
+        result.push(items[i].key);
+      }
+    }
+  }
+  return result;
+}
+

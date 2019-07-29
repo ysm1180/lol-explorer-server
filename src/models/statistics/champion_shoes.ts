@@ -1,27 +1,29 @@
 import { Document, model, Schema } from 'mongoose';
 import { POSITION } from '../../lib/demacia/constants';
 
-export interface IStatisticsChampionStartItemModel extends Document {
+export interface IStatisticsChampionShoesModel extends Document {
   championKey: number;
   position: POSITION;
   tier: string;
   count: number;
   win: number;
   gameVersion: string;
-  items: number[];
+  shoes: number;
+  averageTimestamp: number;
 }
 
-var statisticsChampionStartItemSchema = new Schema({
+var statisticsChampionShoesSchema = new Schema({
   championKey: Number,
   position: Number,
   tier: String,
   count: Number,
   win: Number,
   gameVersion: String,
-  items: [Number],
+  shoes: Number,
+  averageTimestamp: Number,
 });
 
-export default model<IStatisticsChampionStartItemModel>(
-  'statistics_champion_start_item',
-  statisticsChampionStartItemSchema
+export default model<IStatisticsChampionShoesModel>(
+  'statistics_champion_shoes',
+  statisticsChampionShoesSchema
 );

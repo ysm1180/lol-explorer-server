@@ -5,7 +5,6 @@ export interface IStatisticsChampionRivalRuneBuildModel extends Document {
   championKey: number;
   rivalChampionKey: number;
   position: POSITION;
-  tier: string;
   count: number;
   win: number;
   gameVersion: string;
@@ -20,7 +19,6 @@ var statisticsChampionRivalRuneBuildSchema = new Schema({
   championKey: Number,
   rivalChampionKey: Number,
   position: Number,
-  tier: String,
   count: Number,
   win: Number,
   gameVersion: String,

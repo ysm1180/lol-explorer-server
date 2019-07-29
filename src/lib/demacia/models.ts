@@ -148,6 +148,9 @@ export interface IGameParticipantData {
     statPerk2: number;
   };
   timeline: {
+    creepsPerMinDeltas?: { [duration: string]: number };
+    xpPerMinDeltas?: { [duration: string]: number };
+    goldPerMinDeltas?: { [duration: string]: number };
     participantId: number;
     role: string;
     lane: 'TOP' | 'MID' | 'MIDDLE' | 'JUNGLE' | 'BOTTOM' | 'NONE';

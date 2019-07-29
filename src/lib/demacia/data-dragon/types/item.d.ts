@@ -84,8 +84,8 @@ export interface IItemDataDragon {
   description: string;
   colloq: string;
   plaintext: string;
-  from?: number[];
-  into?: number[];
+  from?: string[];
+  into?: string[];
   image: ImageDataDragon;
   gold: IItemCostDataDragon;
   tags: string[];
@@ -93,4 +93,5 @@ export interface IItemDataDragon {
   stats: IItemStatsDataDragon;
   id: number;
   consumed?: boolean;
+  requiredAlly? : string;
 }

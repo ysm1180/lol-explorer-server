@@ -9,9 +9,29 @@ import StatisticsChampion from '../models/statistics/champion';
 import StatisticsGame, { IStatisticsGameModel } from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
-import { getConsumedStaticItemIdList, getFinalStaticItemIdList, getShoesStaticItemIdList } from '../models/util/static';
-import { saveChampionBans, saveChampionPosition, saveChampionPurchasedItems, saveChampionRivalData, saveChampionRune, saveChampionShoes, saveChampionSkillSet, saveChampionSpell, saveChampionStartItem, saveChampionTimeWin } from '../models/util/statistics';
-import { getItemEvents, getSkillLevelupSlots, getSoloKills, getStartItemIdList } from '../models/util/timeline';
+import {
+  getConsumedStaticItemIdList,
+  getFinalStaticItemIdList,
+  getShoesStaticItemIdList,
+} from '../models/util/static';
+import {
+  saveChampionBans,
+  saveChampionPosition,
+  saveChampionPurchasedItems,
+  saveChampionRivalData,
+  saveChampionRune,
+  saveChampionShoes,
+  saveChampionSkillSet,
+  saveChampionSpell,
+  saveChampionStartItem,
+  saveChampionTimeWin,
+} from '../models/util/statistics';
+import {
+  getItemEvents,
+  getSkillLevelupSlots,
+  getSoloKills,
+  getStartItemIdList,
+} from '../models/util/timeline';
 import devApi, { IDevApiClassData } from './api';
 
 const app = express();
@@ -28,13 +48,18 @@ router.post('/add/:key', async (req, res, next) => {
 
 app.use('/api', router);
 
-const gameList = async (prev: number[], size: number) => {
+const gameList = async (size: number) => {
   const games = await StatisticsGame.aggregate([
     {
       $match: {
-        gameId: {
-          $nin: prev,
-        },
+        $or: [
+          {
+            isReady: false,
+          },
+          {
+            isReady: null,
+          },
+        ],
       },
     },
     {
@@ -46,12 +71,10 @@ const gameList = async (prev: number[], size: number) => {
   const result = [];
 
   for (let i = 0; i < games.length; i++) {
-    if (!prev.includes(games[i].gameId)) {
-      result.push({
-        game: games[i],
-        selected: false,
-      });
-    }
+    result.push({
+      game: games[i],
+      selected: false,
+    });
   }
 
   return [...new Set(result)];
@@ -70,7 +93,7 @@ DevApi.find().then(async (data) => {
         console.log(`Expired function error ${err}`);
       }
     });
-    devApi.setSharedData(await gameList([], 10000));
+    devApi.setSharedData(await gameList(200));
     devApi.setProcessFunction(
       async (
         sharedData: { game: IStatisticsGameModel; selected: boolean }[],
@@ -109,10 +132,11 @@ DevApi.find().then(async (data) => {
             unselectedList = sharedData.filter((data) => !data.selected);
           }
 
-          const newGameList = await gameList(sharedData.map((data) => data.game.gameId), 10000);
+          const newGameList = await gameList(200);
           if (newGameList.length === 0) {
             break;
           }
+          sharedData.splice(0, sharedData.length);
           sharedData.push(...newGameList);
           console.log(`NEW ADD GAME ${newGameList.length}`);
           unselectedList = sharedData.filter((data) => !data.selected);
@@ -130,17 +154,17 @@ DevApi.find().then(async (data) => {
 });
 
 async function start(demacia: Demacia, game: IStatisticsGameModel) {
+  const gameModel = await StatisticsGame.findOne({ gameId: game.gameId });
+  if (!gameModel || (gameModel && gameModel.isReady)) {
+    return;
+  }
+
+  let timeline = await GameTimeline.findOne({ gameId: game.gameId });
+  if (!timeline) {
+    return;
+  }
+
   try {
-    const gameModel = await StatisticsGame.findOne({ gameId: game.gameId });
-    if (!gameModel) {
-      return;
-    }
-
-    let timeline = await GameTimeline.findOne({ gameId: game.gameId });
-    if (!timeline) {
-      return;
-    }
-
     const getGameVersion = (version: string) => {
       const temp = version.split('.');
       return `${temp[0]}.${temp[1]}`;
@@ -203,8 +227,6 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
       const participantId = game.participantIdentities[i].participantId;
       if (positions[participantId] !== POSITION.UNKNOWN) {
         try {
-          gameModel.isAnalyze[participantId] = true;
-
           let tier: string = 'UNRANKED';
 
           const queueType =
@@ -244,6 +266,72 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
             tier = summoner.tier;
           }
 
+          const participantData = game.participants.find(
+            (participant) => participant.participantId === participantId
+          )!;
+          const teamData = game.teams.find((team) => team.teamId === participantData.teamId)!;
+
+          const gameId = game.gameId;
+          const isWin = participantData.stats.win;
+          const teamId = teamData.teamId;
+          const championKey = participantData.championId;
+          const stats = participantData.stats;
+          const spells = [participantData.spell1Id, participantData.spell2Id].sort((a, b) => a - b);
+          const mainRuneStyle = stats.perkPrimaryStyle;
+          const mainRunes = [stats.perk0, stats.perk1, stats.perk2, stats.perk3];
+          const subRuneStyle = stats.perkSubStyle;
+          const subRunes = [stats.perk4, stats.perk5];
+          const statRunes = [stats.statPerk0, stats.statPerk1, stats.statPerk2];
+          const participantTimeline = participantData.timeline;
+          const gameMinutes = Math.floor(game.gameDuration / 60);
+          const skills = getSkillLevelupSlots(timeline, participantId);
+          const items = getItemEvents(timeline, participantId).sort(
+            (a, b) => a.timestamp - b.timestamp
+          );
+          const position = positions[participantId];
+
+          const totalPurchasedItemEvent = [];
+          const purchasedItemIds = [];
+          let finalShoes = {
+            itemId: 0,
+            timestamp: 0,
+          };
+
+          for (const item of items) {
+            if (item.type === 'ITEM_PURCHASED') {
+              if (
+                !consumedItemList.includes(item.itemId) &&
+                finalItemList.includes(item.itemId) &&
+                !shoesItemList.includes(item.itemId)
+              ) {
+                purchasedItemIds.push(item.itemId);
+              }
+
+              if (
+                finalShoes.itemId === 0 &&
+                !consumedItemList.includes(item.itemId) &&
+                finalItemList.includes(item.itemId) &&
+                shoesItemList.includes(item.itemId)
+              ) {
+                finalShoes.itemId = item.itemId;
+                finalShoes.timestamp = item.timestamp;
+              }
+              totalPurchasedItemEvent.push(item);
+            } else if (item.type === 'ITEM_UNDO') {
+              let index = purchasedItemIds.indexOf(item.itemId);
+              if (index !== -1) {
+                purchasedItemIds.splice(index, 1);
+              }
+
+              index = totalPurchasedItemEvent.findIndex((event) => event.itemId === item.itemId);
+              if (index !== -1) {
+                totalPurchasedItemEvent.splice(index, 1);
+              }
+            }
+          }
+
+          const startItemIds = getStartItemIdList(timeline, participantId);
+
           if (
             tier === 'PLATINUM' ||
             tier === 'DIAMOND' ||
@@ -251,72 +339,6 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
             tier === 'GRANDMASTER' ||
             tier === 'CHALLENGER'
           ) {
-            const participantData = game.participants.find(
-              (participant) => participant.participantId === participantId
-            )!;
-            const teamData = game.teams.find((team) => team.teamId === participantData.teamId)!;
-
-            const gameId = game.gameId;
-            const isWin = participantData.stats.win;
-            const teamId = teamData.teamId;
-            const championKey = participantData.championId;
-            const stats = participantData.stats;
-            const spells = [participantData.spell1Id, participantData.spell2Id].sort(
-              (a, b) => a - b
-            );
-            const mainRuneStyle = stats.perkPrimaryStyle;
-            const mainRunes = [stats.perk0, stats.perk1, stats.perk2, stats.perk3];
-            const subRuneStyle = stats.perkSubStyle;
-            const subRunes = [stats.perk4, stats.perk5];
-            const statRunes = [stats.statPerk0, stats.statPerk1, stats.statPerk2];
-            const participantTimeline = participantData.timeline;
-            const gameMinutes = Math.floor(game.gameDuration / 60);
-            const skills = getSkillLevelupSlots(timeline, participantId);
-            const items = getItemEvents(timeline, participantId).sort(
-              (a, b) => a.timestamp - b.timestamp
-            );
-            const position = positions[participantId];
-
-            const totalPurchasedItemEvent = [];
-            const purchasedItemIds = [];
-            let finalShoes = {
-              itemId: 0,
-              timestamp: 0,
-            };
-
-            for (const item of items) {
-              if (item.type === 'ITEM_PURCHASED') {
-                if (
-                  !consumedItemList.includes(item.itemId) &&
-                  finalItemList.includes(item.itemId) &&
-                  !shoesItemList.includes(item.itemId)
-                ) {
-                  purchasedItemIds.push(item.itemId);
-                }
-
-                if (
-                  finalShoes.itemId === 0 &&
-                  !consumedItemList.includes(item.itemId) &&
-                  finalItemList.includes(item.itemId) &&
-                  shoesItemList.includes(item.itemId)
-                ) {
-                  finalShoes.itemId = item.itemId;
-                  finalShoes.timestamp = item.timestamp;
-                }
-                totalPurchasedItemEvent.push(item);
-              } else if (item.type === 'ITEM_UNDO') {
-                let index = purchasedItemIds.indexOf(item.itemId);
-                if (index !== -1) {
-                  purchasedItemIds.splice(index, 1);
-                }
-
-                index = totalPurchasedItemEvent.findIndex((event) => event.itemId === item.itemId);
-                if (index !== -1) {
-                  totalPurchasedItemEvent.splice(index, 1);
-                }
-              }
-            }
-
             champions.push({
               gameId,
               isWin,
@@ -330,16 +352,8 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
               position,
               rivalData: rivals[participantId],
             });
-            const startItemIds = getStartItemIdList(timeline, participantId);
 
             await Promise.all([
-              saveChampionTimeWin({
-                championKey,
-                position,
-                gameMinutes,
-                gameVersion,
-                isWin,
-              }),
               saveChampionPosition({
                 championKey,
                 tier,
@@ -412,50 +426,60 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
                 timestamp: finalShoes.timestamp,
               });
             }
-
-            if (rivals[participantId]) {
-              await saveChampionRivalData({
-                championKey,
-                rivalChampionKey: rivals[participantId].championKey,
-                position,
-                gameVersion,
-                isWin,
-                shoes: {
-                  itemId: finalShoes.itemId,
-                  timestamp: finalShoes.timestamp,
-                },
-                items: purchasedItemIds,
-                startItems: startItemIds,
-                spells,
-                runeData: {
-                  mainRuneStyle,
-                  mainRunes,
-                  subRuneStyle,
-                  subRunes,
-                  statRunes,
-                },
-                stats: {
-                  kills: stats.kills,
-                  deaths: stats.deaths,
-                  assists: stats.assists,
-                  damageDealtToChampions: stats.totalDamageDealtToChampions,
-                  damageTaken: stats.totalDamageTaken,
-                  goldEarned: stats.goldEarned,
-                  csPerMinutes: participantData.timeline.creepsPerMinDeltas,
-                  xpPerMinutes: participantData.timeline.xpPerMinDeltas,
-                  goldPerMinutes: participantData.timeline.goldPerMinDeltas,
-                  killPercent:
-                    (participantData.stats.kills + participantData.stats.assists) /
-                    totalKillsByTeam[teamId],
-                  soloKills: getSoloKills(
-                    timeline,
-                    participantId,
-                    rivals[participantId].participantId
-                  ),
-                },
-              });
-            }
           }
+
+          await saveChampionTimeWin({
+            championKey,
+            position,
+            gameMinutes,
+            gameVersion,
+            isWin,
+          });
+
+          if (rivals[participantId]) {
+            await saveChampionRivalData({
+              championKey,
+              rivalChampionKey: rivals[participantId].championKey,
+              position,
+              gameVersion,
+              isWin,
+              shoes: {
+                itemId: finalShoes.itemId,
+                timestamp: finalShoes.timestamp,
+              },
+              items: purchasedItemIds,
+              startItems: startItemIds,
+              spells,
+              runeData: {
+                mainRuneStyle,
+                mainRunes,
+                subRuneStyle,
+                subRunes,
+                statRunes,
+              },
+              stats: {
+                kills: stats.kills,
+                deaths: stats.deaths,
+                assists: stats.assists,
+                damageDealtToChampions: stats.totalDamageDealtToChampions,
+                damageTaken: stats.totalDamageTaken,
+                goldEarned: stats.goldEarned,
+                csPerMinutes: participantData.timeline.creepsPerMinDeltas,
+                xpPerMinutes: participantData.timeline.xpPerMinDeltas,
+                goldPerMinutes: participantData.timeline.goldPerMinDeltas,
+                killPercent:
+                  (participantData.stats.kills + participantData.stats.assists) /
+                  totalKillsByTeam[teamId],
+                soloKills: getSoloKills(
+                  timeline,
+                  participantId,
+                  rivals[participantId].participantId
+                ),
+              },
+            });
+          }
+
+          gameModel.isAnalyze[participantId] = true;
         } catch (err) {
           if (err.response && err.response.status === 403) {
             return Promise.reject(err);
@@ -467,13 +491,16 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
           } else {
             console.log(err);
           }
+
           gameModel.isAnalyze[participantId] = false;
         }
       }
 
-      await gameModel.save();
       await StatisticsChampion.insertMany(champions);
     }
+
+    gameModel.isReady = true;
+    await gameModel.save();
 
     return Promise.resolve(true);
   } catch (err) {
@@ -483,6 +510,9 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
     } else {
       console.log(err);
     }
+
+    gameModel.isReady = false;
+    await gameModel.save();
 
     return Promise.reject(err);
   }

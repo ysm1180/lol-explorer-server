@@ -4,6 +4,7 @@ import * as models from '../../lib/demacia/models';
 export interface IStatisticsGameModel extends models.IGameApiData, Document {
   seasonId: number;
   isAnalyze: boolean[];
+  isReady: boolean;
 }
 
 var gameSchema = new Schema({
@@ -27,6 +28,7 @@ var gameSchema = new Schema({
     type: ['Mixed'],
   },
   isAnalyze: [Boolean],
+  isReady: Boolean,
 });
 
 export default model<IStatisticsGameModel>('statistics_game', gameSchema);

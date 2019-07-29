@@ -545,7 +545,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       game.isAnalyze = [false, false, false, false, false, false, false, false, false, false];
       await timeline.save();
 
-      const positions = getPositions(game);
+      const positions = await getPositions(game);
       const champions = [];
       const teams = game.teams;
 

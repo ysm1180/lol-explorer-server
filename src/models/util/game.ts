@@ -303,8 +303,8 @@ export async function getPredictPositions(game: IGameModel) {
   return positionsByTeam;
 }
 
-export function getPositions(game: IGameModel) {
-  const positions = getPredictPositions(game);
+export async function getPositions(game: IGameModel) {
+  const positions = await getPredictPositions(game);
 
   const temp = [];
   for (const value of Object.values(positions)) {
@@ -322,7 +322,7 @@ export function getPositions(game: IGameModel) {
 export async function updateChampionAnalysisByGame(game: IGameModel) {
   try {
     const summoners = game.participantIdentities;
-    const positions = getPositions(game);
+    const positions = await getPositions(game);
     for (let i = 0; i < summoners.length; i++) {
       const participant = game.participants.find((p) => {
         return p.participantId === summoners[i].participantId;

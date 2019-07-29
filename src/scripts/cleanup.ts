@@ -238,29 +238,35 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
             queue: queueType,
           });
           if (!summoner) {
-            const summonerApiData = await demacia.getSummonerByName(summonerData.summonerName);
-            const summonerLeagueApiData = await demacia.getLeagueBySummonerId(summonerApiData.id);
-
             let rank = '';
-            for (let j = 0; j < summonerLeagueApiData.length; j++) {
-              if (summonerLeagueApiData[j].queueType == queueType) {
-                tier = summonerLeagueApiData[j].tier;
-                rank = summonerLeagueApiData[j].rank;
+            try {
+              const summonerApiData = await demacia.getSummonerByName(summonerData.summonerName);
+              const summonerLeagueApiData = await demacia.getLeagueBySummonerId(summonerApiData.id);
+
+              for (let j = 0; j < summonerLeagueApiData.length; j++) {
+                if (summonerLeagueApiData[j].queueType == queueType) {
+                  tier = summonerLeagueApiData[j].tier;
+                  rank = summonerLeagueApiData[j].rank;
+                }
               }
-            }
-            if (
-              tier === 'PLATINUM' ||
-              tier === 'DIAMOND' ||
-              tier === 'MASTER' ||
-              tier === 'GRANDMASTER' ||
-              tier === 'CHALLENGER'
-            ) {
-              await new StatisticsSummoner({
-                name: summonerData.summonerName,
-                queue: queueType,
-                tier,
-                rank,
-              }).save();
+              if (
+                tier === 'PLATINUM' ||
+                tier === 'DIAMOND' ||
+                tier === 'MASTER' ||
+                tier === 'GRANDMASTER' ||
+                tier === 'CHALLENGER'
+              ) {
+                await new StatisticsSummoner({
+                  name: summonerData.summonerName,
+                  queue: queueType,
+                  tier,
+                  rank,
+                }).save();
+              }
+            } catch (err) {
+              if (err.response && err.response.status === 404) {
+                console.log(`${summonerData.summonerName} NOT Found.`);
+              }
             }
           } else {
             tier = summoner.tier;

@@ -60,14 +60,25 @@ const gameList = async (size: number) => {
   return [...new Set(result)];
 };
 
-const sleep = (ms: number) => {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-};
-
 let isFinished = false;
-let lock = false;
+export class Lock {
+  private tip: Promise<void>;
+
+  constructor() {
+    this.tip = Promise.resolve<void>(undefined);
+  }
+
+  public async acquire(): Promise<() => void> {
+    const oldTip = this.tip;
+    let resolver = () => {};
+    const promise = new Promise<void>((resolve) => {
+      resolver = resolve;
+    });
+    this.tip = oldTip.then(() => promise);
+    return oldTip.then(() => resolver);
+  }
+}
+const lock = new Lock();
 
 console.log('Clean UP');
 DevApi.find().then(async (data) => {
@@ -128,11 +139,7 @@ DevApi.find().then(async (data) => {
             unselectedList = sharedData.filter((data) => !data.selected);
           }
 
-          while (lock) {
-            console.log(`${apiClassData.key} LOCKED`);
-            await sleep(2000);
-          }
-          console.log(`${apiClassData.key} UNLOCKED`);
+          const releaser = await lock.acquire();
 
           if (isFinished) {
             console.log(`${apiClassData.key} FINISHED`);
@@ -141,22 +148,24 @@ DevApi.find().then(async (data) => {
 
           unselectedList = sharedData.filter((data) => !data.selected);
           if (unselectedList.length > 0) {
+            releaser();
             continue;
           }
 
-          lock = true;
           const newGameList = await gameList(200);
           if (newGameList.length === 0) {
             console.log(`${apiClassData.key} FINISHED`);
             isFinished = true;
-            lock = false;
+            releaser();
             break;
           }
+
           sharedData.splice(0, sharedData.length);
           sharedData.push(...newGameList);
           console.log(`NEW ADD GAME ${newGameList.length}`);
           unselectedList = sharedData.filter((data) => !data.selected);
-          lock = false;
+
+          releaser();
         }
 
         console.log('END');

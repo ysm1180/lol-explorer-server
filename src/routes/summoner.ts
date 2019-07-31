@@ -116,14 +116,6 @@ router.post('/:name', async function(req, res, next) {
   }
 });
 
-router.get('/matches/test/:accountId', async function(req, res, next) {
-  try {
-    res.json(await getMatchListExactly(req.params.accountId, 0, 100));
-  } catch (err) {
-    next(err);
-  }
-});
-
 router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   try {
     const start = Number(req.params.start);

@@ -285,7 +285,7 @@ export class RateLimiter {
     ) {
       this.refresh();
     }
-    
+
     return this.queue;
   }
 
@@ -391,9 +391,7 @@ export class RateLimiter {
           .then(resolve)
           .catch(reject);
       });
-    } else {
-
-    }
+    } 
   }
 
   public getQueue() {

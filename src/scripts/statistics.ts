@@ -1,10 +1,6 @@
-import axios from 'axios';
-import * as express from 'express';
-import mongo from '../db/mongo';
 import { GAME_QUEUE_ID, LEAGUE_QUEUE_TYPE, MAP_ID, POSITION } from '../lib/demacia/constants';
 import { Demacia } from '../lib/demacia/demacia';
 import GameTimeline from '../models/game-timeline';
-import DevApi from '../models/statistics/api';
 import StatisticsChampion from '../models/statistics/champion';
 import StatisticsGame from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
@@ -12,21 +8,10 @@ import { getPositions } from '../models/util/game';
 import { getConsumedStaticItemIdList, getFinalStaticItemIdList, getShoesStaticItemIdList } from '../models/util/static';
 import { saveChampionBans, saveChampionPosition, saveChampionPurchasedItems, saveChampionRivalData, saveChampionRune, saveChampionShoes, saveChampionSkillSet, saveChampionSpell, saveChampionStartItem, saveChampionTimeWin } from '../models/util/statistics';
 import { getItemEvents, getSkillLevelupSlots, getSoloKills, getStartItemIdList } from '../models/util/timeline';
-import devApi, { IDevApiClassData } from './api';
+import { Lock, LolStatisticsWrapper } from './common';
 
-const app = express();
-mongo.connect();
-
-const router = express.Router();
-router.post('/add/:key', async (req, res, next) => {
-  const key = req.params.key;
-  console.log(`RUN PROCESS ${key}`);
-  devApi.run(key);
-
-  res.send('OK');
-});
-
-app.use('/api', router);
+const wrapper = new LolStatisticsWrapper();
+const lock = new Lock();
 
 const summonerList = async (size: number) => {
   const summoners = await StatisticsSummoner.aggregate([
@@ -91,130 +76,79 @@ const getSummonerAccountId = async (demacia: Demacia, name: string) => {
   }
 };
 
-let isFinished = false;
-export class Lock {
-  private tip: Promise<void>;
-
-  constructor() {
-    this.tip = Promise.resolve<void>(undefined);
+summonerList(1000).then((initData) => {
+  if (initData.length === 0) {
+    console.log('END');
+    return;
   }
 
-  public async acquire(): Promise<() => void> {
-    const oldTip = this.tip;
-    let resolver = () => {};
-    const promise = new Promise<void>((resolve) => {
-      resolver = resolve;
-    });
-    this.tip = oldTip.then(() => promise);
-    return oldTip.then(() => resolver);
-  }
-}
-const lock = new Lock();
+  let lockReleaser;
 
-DevApi.find().then(async (data) => {
-  try {
-    const keys = data.map((k) => k.key);
-    devApi.setExpiredFn(async (key: string) => {
-      try {
-        await axios.post('http://localhost:5555/expired', { api_key: key });
-        console.log(`EXPIRED ${key}`);
-        devApi.removeKey(key);
-      } catch (err) {
-        console.log(`Expired function error ${err}`);
-      }
-    });
-    const initData = await summonerList(1000);
-    if (initData.length === 0) {
-      console.log('END');
-      return;
-    }
+  wrapper.run(initData, async (sharedData: { name: string; selected: boolean }[], apiClassData) => {
+    while (true) {
+      while (true) {
+        lockReleaser = await lock.acquire();
 
-    devApi.setSharedData(initData);
-    devApi.setProcessFunction(
-      async (sharedData: { name: string; selected: boolean }[], apiClassData: IDevApiClassData) => {
         let unselectedList = sharedData.filter((data) => !data.selected);
-
-        while (true) {
-          while (unselectedList.length > 0) {
-            const idx = Math.floor(Math.random() * unselectedList.length);
-            if (!unselectedList[idx].selected) {
-              try {
-                unselectedList[idx].selected = true;
-
-                const name = unselectedList[idx].name;
-                const accountId = await getSummonerAccountId(apiClassData.demacia, name);
-                const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountId))
-                  .matches;
-                for (let j = 0; j < matchList.length; j++) {
-                  console.log(
-                    `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.key} Analyze ${
-                      matchList[j].gameId
-                    }`
-                  );
-                  const result = await analyzeGame(apiClassData.demacia, matchList[j].gameId);
-                  if (!result) {
-                    break;
-                  }
-                }
-              } catch (err) {
-                if (err.response && err.response.status === 403) {
-                  unselectedList[idx].selected = false;
-                  return Promise.reject(err);
-                }
-
-                if (err.response) {
-                  console.error(err.response.data);
-                } else {
-                  console.error(err);
-                }
-              }
-            }
-
-            unselectedList = sharedData.filter((data) => !data.selected);
-          }
-
-          const releaser = await lock.acquire();
-
-          if (isFinished) {
-            console.log(`${apiClassData.key} FINISHED`);
-            break;
-          }
-
-          unselectedList = sharedData.filter((data) => !data.selected);
-          if (unselectedList.length > 0) {
-            releaser();
-            continue;
-          }
-
-          const newSummonerList = await summonerList(1000);
-          if (newSummonerList.length === 0) {
-            console.log(`${apiClassData.key} FINISHED`);
-            isFinished = true;
-            releaser();
-            break;
-          }
-          
-          sharedData.splice(0, sharedData.length);
-          sharedData.push(...newSummonerList);
-          console.log(`NEW ADD SUMMONER ${newSummonerList.length}`);
-          unselectedList = sharedData.filter((data) => !data.selected);
-
-          releaser();
+        if (unselectedList.length === 0) {
+          lockReleaser();
+          break;
         }
 
-        console.log('END');
+        const idx = Math.floor(Math.random() * unselectedList.length);
+        unselectedList[idx].selected = true;
+
+        lockReleaser();
+
+        try {
+          const name = unselectedList[idx].name;
+          const accountId = await getSummonerAccountId(apiClassData.demacia, name);
+          const matchList = (await apiClassData.demacia.getMatchListByAccountId(accountId)).matches;
+          for (let j = 0; j < matchList.length; j++) {
+            const result = await analyzeGame(apiClassData.demacia, matchList[j].gameId);
+            if (!result) {
+              break;
+            }
+
+            console.log(
+              `[${new Date().toLocaleTimeString('ko-KR')}] ${apiClassData.key} Analyze ${
+                matchList[j].gameId
+              }`
+            );
+          }
+        } catch (err) {
+          if (err.response && err.response.status === 403) {
+            unselectedList[idx].selected = false;
+            return Promise.reject(err);
+          }
+        }
       }
-    );
 
-    await devApi.runAll(keys);
-    return;
-  } catch (err) {
-    return Promise.reject(err);
-  }
+      lockReleaser = await lock.acquire();
+
+      if (sharedData.filter((data) => !data.selected).length > 0) {
+        lockReleaser();
+        continue;
+      } else if (sharedData.length === 0) {
+        lockReleaser();
+        break;
+      }
+
+      sharedData.splice(0, sharedData.length);
+
+      const newSummonerList = await summonerList(1000);
+      if (newSummonerList.length === 0) {
+        lockReleaser();
+        break;
+      }
+
+      sharedData.push(...newSummonerList);
+      console.log(`NEW ADD SUMMONER ${newSummonerList.length}`);
+
+      lockReleaser();
+    }
+  });
 });
-
-var port = process.env.PORT || 6666;
-app.listen(port);
 
 export async function analyzeGame(demacia: Demacia, gameId: number) {
   let game = await StatisticsGame.findOne({ gameId });

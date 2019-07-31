@@ -1,19 +1,17 @@
 const path = require('path');
 const nodeExternals = require('webpack-node-externals');
-const NodemonPlugin = require('nodemon-webpack-plugin');
-
-const environment = process.env.NODE_ENV || 'development';
-const isProd = environment === 'production';
 
 module.exports = [
   {
-    name: 'server',
+    name: 'statistics',
     optimization: {
       noEmitOnErrors: true,
     },
-    mode: environment,
+    mode: 'development',
     entry: {
-      main: ['@babel/polyfill', path.resolve(__dirname, 'src', 'app.ts')],
+      summoners: ['@babel/polyfill', path.resolve(__dirname, 'src', 'scripts', 'summoners.ts')],
+      statistics: ['@babel/polyfill', path.resolve(__dirname, 'src', 'scripts', 'statistics.ts')],
+      reorganization: ['@babel/polyfill', path.resolve(__dirname, 'src', 'scripts', 'reorganization.ts')],
     },
     output: {
       path: path.resolve(__dirname, 'dist'),
@@ -33,7 +31,7 @@ module.exports = [
                 useBabel: true,
                 babelCore: '@babel/core',
                 useCache: true,
-                configFileName: isProd ? 'tsconfig.prod.json' : 'tsconfig.json',
+                configFileName: 'tsconfig.json',
               },
             },
           ],
@@ -48,13 +46,6 @@ module.exports = [
         },
       ],
     },
-    plugins: [
-      new NodemonPlugin({
-        watch: path.resolve('./dist/main.js'),
-        script: './dist/main.js',
-        delay: '1000',
-      }),
-    ],
     resolve: {
       extensions: ['.js', '.ts', '.tsx'],
       modules: [path.resolve(__dirname, 'node_modules/')],

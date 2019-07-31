@@ -1,4 +1,4 @@
-import mongo from '../db/mongo';
+import mongo from '../../db/mongo';
 
 // mongo db
 const truncateCollections = [

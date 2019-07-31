@@ -4,15 +4,16 @@
   "private": true,
   "main": "src/main.js",
   "scripts": {
-    "init:mongo": "ts-node ./script/init-mongo.ts",
     "start": "webpack --watch",
     "build:dev": "cross-env NODE_ENV=development webpack",
     "build:prod": "cross-env NODE_ENV=production webpack",
-    "test": "cross-env NODE_ENV=test nyc mocha -r ts-node/register ./test/*.spec.ts --exit",
-    "script:summoner": "ts-node ./src/scripts/summoners.ts",
-    "script:statistics": "ts-node ./src/scripts/statistics.ts",
-    "script:reorg": "ts-node ./src/scripts/reorganization.ts",
-    "init:statistics": "ts-node ./src/scripts/init-statistics.ts"
+    "build:script": "webpack --config webpack.script.config.js",
+    "script:summoner": "yarn build:script & node ./dist/summoners.js",
+    "script:statistics": "yarn build:script & node ./dist/statistics.js",
+    "script:reorg": "yarn build:script & node ./dist/reorganization.js",
+    "init:mongo": "ts-node ./src/scripts/init/mongo.ts",
+    "init:statistics": "ts-node ./src/scripts/init/statistics.ts",
+    "test": "cross-env NODE_ENV=test nyc mocha -r ts-node/register ./test/*.spec.ts --exit"
 
   },
   "nyc": {

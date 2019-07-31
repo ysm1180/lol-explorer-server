@@ -1,22 +1,23 @@
 import { Demacia } from '../lib/demacia/demacia';
 import { STRATEGY } from '../lib/demacia/ratelimiter/ratelimiter';
 
-type ExpiredFunction = (key: string) => Promise<void>;
-type ProcessFunction = (dataArray: any[], classData: IDevApiClassData) => Promise<void>;
-export interface IDevApiClassData {
+export type RunnerExpiredFn = (key: string) => Promise<void>;
+export type RunnerProcessFn = (dataArray: any[], runnerData: IRunnerData) => Promise<void>;
+
+export interface IRunnerData {
   demacia: Demacia;
   key: string;
 }
 
-export class LolStatisticsWrapper {
+export class LolDemaciaRunner {
   private sharedData: any;
-  private expiredFunction: ExpiredFunction = () => Promise.resolve();
-  private process: ProcessFunction = () => Promise.resolve();
+  private expiredFunction: RunnerExpiredFn = () => Promise.resolve();
+  private process: RunnerProcessFn = () => Promise.resolve();
   private running: { [key: string]: Promise<void> } = {};
 
   constructor() {}
 
-  public removeKey(key: string) {
+  private removeKey(key: string) {
     delete this.running[key];
   }
 
@@ -24,11 +25,11 @@ export class LolStatisticsWrapper {
     this.sharedData = data;
   }
 
-  public setProcessFunction(fn: ProcessFunction) {
+  public setProcessFunction(fn: RunnerProcessFn) {
     this.process = fn;
   }
 
-  public setExpiredFn(fn: ExpiredFunction) {
+  public setExpiredFn(fn: RunnerExpiredFn) {
     this.expiredFunction = fn;
   }
 
@@ -38,14 +39,14 @@ export class LolStatisticsWrapper {
     }
 
     this.running[key] = Promise.resolve().then(() => {
-      const classData: IDevApiClassData = {
+      const classData: IRunnerData = {
         demacia: new Demacia(key, STRATEGY.SPREAD),
         key,
       };
 
       return this.process(this.sharedData, classData).catch((err) => {
         if (err.response && err.response.status === 403) {
-          return this.expiredFunction(key);
+          return this.expiredFunction(key).then(() => this.removeKey(key));
         } else {
           return Promise.reject(err);
         }
@@ -60,7 +61,7 @@ export class LolStatisticsWrapper {
     for (let i = 0; i < keys.length; i++) {
       promises.push(this.run(keys[i])!);
     }
-    
+
     return Promise.all(promises).catch((err) => {
       console.log('[CRITICAL ERROR!]');
       console.log(err);
@@ -69,4 +70,4 @@ export class LolStatisticsWrapper {
   }
 }
 
-export default new LolStatisticsWrapper();
+export default new LolDemaciaRunner();

@@ -61,10 +61,19 @@ router.get('/spell/all', async function(req, res, next) {
 
       clientData.key = Number(clientData.key);
       clientData.iconUrl = DDragonHelper.URL_SPELL_ICON(version, rawData.image.full);
+      delete clientData.costBurn;
+      delete clientData.cost;
+      delete clientData.datavalues;
+      delete clientData.vars;
+      delete clientData.maxammo;
       delete clientData.image;
       delete clientData.effect;
       delete clientData.effectBurn;
       delete clientData.modes;
+      delete clientData.maxrank;
+      delete clientData.tooltip;
+      delete clientData.costType;
+      delete clientData.resource;
 
       result[rawData.key] = clientData;
     }
@@ -103,18 +112,25 @@ router.get('/item/all', async function(req, res, next) {
 });
 
 router.get('/perk/all', function(req, res, next) {
+  const baseIconUrl = DDragonHelper.URL_PERK_ICON();
+
   DDragonHelper.getLatestVersion().then(async (version) => {
     const rawData = await DDragonHelper.getPerkAllData(version);
     const clientData = {} as any;
     for (let i = 0; i < rawData.length; i++) {
       clientData[rawData[i].id] = lodash.cloneDeep(rawData[i]);
+      clientData[rawData[i].id].iconUrl = baseIconUrl + clientData[rawData[i].id].icon;
+      delete clientData[rawData[i].id].icon;
       for (let j = 0; j < rawData[i].slots.length; j++) {
         clientData[rawData[i].id].slots[j].runes = {};
         for (let k = 0; k < rawData[i].slots[j].runes.length; k++) {
-          clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id] = rawData[i].slots[j].runes[k];
+          clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id] =
+            rawData[i].slots[j].runes[k];
+          clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id].iconUrl =
+            baseIconUrl +
+            clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id].icon;
         }
       }
-      clientData.baseIconUrl = DDragonHelper.URL_PERK_ICON();
     }
     res.json(clientData);
   });

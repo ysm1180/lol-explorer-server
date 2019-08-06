@@ -1,5 +1,123 @@
 import { IGameTimelineApiData } from '../../lib/demacia/models';
 
+const MID_LANE = [
+  [4200, 3500],
+  [11300, 10500],
+  [13200, 13200],
+  [10500, 11300],
+  [3300, 4400],
+  [1600, 1600],
+];
+const TOP_LANE = [
+  [-120, 1600],
+  [-120, 14980],
+  [13200, 14980],
+  [13200, 13200],
+  [4000, 13200],
+  [1600, 11000],
+  [1600, 1600],
+];
+const BOT_LANE = [
+  [1600, -120],
+  [14870, -120],
+  [14870, 13200],
+  [13200, 13200],
+  [13270, 4000],
+  [10500, 1700],
+  [1600, 1600],
+];
+const JUNGLE_1 = [
+  [1600, 5000],
+  [1600, 11000],
+  [4000, 13200],
+  [9800, 13200],
+  [10500, 11300],
+  [3300, 4400],
+];
+const JUNGLE_2 = [
+  [5000, 1700],
+  [4200, 3500],
+  [11300, 10500],
+  [13270, 9900],
+  [13270, 4000],
+  [10500, 1700],
+];
+
+function containPoint(polygon: number[][], point: number[]) {
+  let crosses = 0;
+  for (let i = 0; i < polygon.length; i++) {
+    const j = (i + 1) % polygon.length;
+    if (polygon[i][1] > point[1] != polygon[j][1] > point[1]) {
+      const atX =
+        ((polygon[j][0] - polygon[i][0]) * (point[1] - polygon[i][1])) /
+          (polygon[j][1] - polygon[i][1]) +
+        polygon[i][0];
+      if (point[0] < atX) crosses++;
+    }
+  }
+
+  return crosses % 2 > 0;
+}
+
+export function getLanesByCoor(timeline: IGameTimelineApiData, participantId: number) {
+  const frames = timeline.frames;
+
+  const result: string[] = [];
+  for (let i = 1; i < 11; i++) {
+    const frame = frames[i];
+    for (const key in frame.participantFrames) {
+      if (frame.participantFrames[key].participantId === participantId) {
+        const coors = [
+          frame.participantFrames[key].position.x,
+          frame.participantFrames[key].position.y,
+        ];
+        let position = 'UNKNOWN';
+        if (containPoint(JUNGLE_1, coors) || containPoint(JUNGLE_2, coors)) {
+          position = 'JUNGLE';
+        } else if (containPoint(MID_LANE, coors)) {
+          position = 'MID';
+        } else if (containPoint(TOP_LANE, coors)) {
+          position = 'TOP';
+        } else if (containPoint(BOT_LANE, coors)) {
+          position = 'BOTTOM';
+        }
+        result.push(position);
+      }
+    }
+  }
+
+  return result;
+}
+
+export function getMostFrequentLane(timeline: IGameTimelineApiData, participantId: number) {
+  type Lane = 'TOP' | 'JUNGLE' | 'MID' | 'BOTTOM';
+  const lanes = getLanesByCoor(timeline, participantId);
+  const frequency = {
+    TOP: 0,
+    JUNGLE: 0,
+    MID: 0,
+    BOTTOM: 0,
+  };
+  for (const lane of lanes) {
+    if (lane !== 'UNKNOWN') {
+      frequency[lane as Lane]++;
+    }
+  }
+
+  let max = 0;
+  let mostFrequncyLane = 'UNKNOWN';
+  for (const lane in frequency) {
+    if (frequency.hasOwnProperty(lane)) {
+      if (max < frequency[lane as Lane]) {
+        max = frequency[lane as Lane];
+        mostFrequncyLane = lane;
+      }
+    }
+  }
+
+  return mostFrequncyLane;
+}
+
 export function getItemEvents(timeline: IGameTimelineApiData, participantId: number) {
   const result = [];
   for (let i = 0; i < timeline.frames.length; i++) {

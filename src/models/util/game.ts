@@ -3,6 +3,8 @@ import { ItemUtil } from '../../lib/demacia/util/item-util';
 import { IGameModel } from '../game';
 import GameChampion from '../game-champion';
 import StatisticsChampionPositions from '../statistics/champion_position';
+import { IGameTimelineModel } from '../game-timeline';
+import { getMostFrequentLane } from './timeline';
 
 export interface IParticipantPositionData {
   participantId: number;
@@ -34,7 +36,7 @@ export function getFixedPosition(
   return position;
 }
 
-export function getPositionDataByTeam(game: IGameModel) {
+export function getPositionDataByTeam(game: IGameModel, timeline: IGameTimelineModel) {
   const result: {
     [teamId: string]: IParticipantPositionData[];
   } = {};
@@ -52,13 +54,38 @@ export function getPositionDataByTeam(game: IGameModel) {
 
       const { lane, role } = participantData.timeline;
       const { item0, item1, item2, item3, item4, item5, item6 } = participantData.stats;
-      const duplicated = result[teamId].find((data) => data.lane === lane && data.role === role);
-      let position = POSITION.UNKNOWN;
-      if (duplicated) {
-        duplicated.position = POSITION.UNKNOWN;
-      } else {
-        position = getFixedPosition(lane, role);
+      let position = getFixedPosition(lane, role);    
+      
+      if (position === POSITION.UNKNOWN) {
+        const hasSmiteSpell = participantData.spell1Id === 11 || participantData.spell2Id === 11;
+        if (hasSmiteSpell) {
+          position = POSITION.JUNGLE;
+        }
       }
+
+      if (position === POSITION.UNKNOWN) {
+        const hasSupportItem = [item0, item1, item2, item3, item4, item5, item6].filter(
+         (item) => ItemUtil.isSupportItem(item)).length !== 0;
+        if (hasSupportItem) {
+          position = POSITION.SUPPORT;
+        }
+      }
+
+      if (position === POSITION.UNKNOWN) {
+        const mostLane = getMostFrequentLane(timeline, participantId);
+        if (mostLane === 'BOTTOM') {
+
+        }
+      }
+
+      if (position !== POSITION.UNKNOWN) {
+        const duplicated = result[teamId].find((data) => data.position === position);
+        if (duplicated) {
+          duplicated.position = POSITION.UNKNOWN;
+          position = POSITION.UNKNOWN;
+        } 
+      }
+      
       result[teamId].push({
         lane,
         role,
@@ -259,36 +286,14 @@ export async function predictPosition(
   return result;
 }
 
-export async function getPredictPositions(game: IGameModel) {
-  const positionsByTeam = getPositionDataByTeam(game);
+export async function getPredictPositions(game: IGameModel, timeline: IGameTimelineModel) {
+  const positionsByTeam = getPositionDataByTeam(game, timeline);
 
   for (const [, positions] of Object.entries(positionsByTeam)) {
     const fixedPostion: { [id: string]: number } = {};
     for (const data of positions) {
       if (data.position !== POSITION.UNKNOWN) {
         fixedPostion[data.position] = data.championId;
-      }
-    }
-
-    if (!fixedPostion[POSITION.JUNGLE]) {
-      const hasSmiteSpell = positions.filter(
-        (data) => data.position === POSITION.UNKNOWN && data.spells.indexOf(11) !== -1
-      );
-      if (hasSmiteSpell.length === 1) {
-        hasSmiteSpell[0].position = POSITION.JUNGLE;
-        fixedPostion[POSITION.JUNGLE] = hasSmiteSpell[0].championId;
-      }
-    }
-
-    if (!fixedPostion[POSITION.SUPPORT]) {
-      const hasSupportItem = positions.filter(
-        (data) =>
-          data.position === POSITION.UNKNOWN &&
-          data.items.filter((item) => ItemUtil.isSupportItem(item)).length !== 0
-      );
-      if (hasSupportItem.length === 1) {
-        hasSupportItem[0].position = POSITION.SUPPORT;
-        fixedPostion[POSITION.SUPPORT] = hasSupportItem[0].championId;
       }
     }
 
@@ -303,8 +308,8 @@ export async function getPredictPositions(game: IGameModel) {
   return positionsByTeam;
 }
 
-export async function getPositions(game: IGameModel) {
-  const positions = await getPredictPositions(game);
+export async function getPositions(game: IGameModel, timeline: IGameTimelineModel) {
+  const positions = await getPredictPositions(game, timeline);
 
   const temp = [];
   for (const value of Object.values(positions)) {
@@ -319,10 +324,10 @@ export async function getPositions(game: IGameModel) {
   return result;
 }
 
-export async function updateChampionAnalysisByGame(game: IGameModel) {
+export async function updateChampionAnalysisByGame(game: IGameModel, timeline: IGameTimelineModel) {
   try {
     const summoners = game.participantIdentities;
-    const positions = await getPositions(game);
+    const positions = await getPositions(game, timeline);
     for (let i = 0; i < summoners.length; i++) {
       const participant = game.participants.find((p) => {
         return p.participantId === summoners[i].participantId;

@@ -116,6 +116,19 @@ summonerList(1000).then((initData) => {
               }`
             );
           }
+
+          try {
+            lockReleaser = await lock.acquire();
+
+            const selectedSummoner = await StatisticsSummoner.findOne({ name });
+            if (selectedSummoner) {
+              selectedSummoner.isReady = true;
+              selectedSummoner.save();
+            }
+          } catch {
+          } finally {
+            lockReleaser();
+          }
         } catch (err) {
           if (err.response && err.response.status === 403) {
             unselectedList[idx].selected = false;
@@ -147,6 +160,8 @@ summonerList(1000).then((initData) => {
 
       lockReleaser();
     }
+
+    await StatisticsSummoner.updateMany({}, { $set: { isReady: false } });
   });
 });
 
@@ -171,7 +186,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
     };
     const gameVersion = getGameVersion(game.gameVersion);
 
-    if (gameVersion !== '9.14' && gameVersion !== '9.13' && gameVersion !== '9.12') {
+    if (gameVersion !== '9.15' && gameVersion !== '9.14' && gameVersion !== '9.13' && gameVersion !== '9.12') {
       return Promise.resolve(false);
     }
 
@@ -187,7 +202,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
 
       await timeline.save();
 
-      const positions = await getPositions(game);
+      const positions = await getPositions(game, timeline);
       const champions = [];
       const teams = game.teams;
 

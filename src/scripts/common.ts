@@ -58,6 +58,8 @@ export class LolStatisticsWrapper {
     try {
       await this.runner.runAll(keys);
       console.log('END');
+
+      process.exit(0);
     } catch (err) {
       console.log(err);
     } finally {

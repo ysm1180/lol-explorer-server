@@ -68,7 +68,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
     const finalItemList = await getFinalStaticItemIdList();
     const shoesItemList = await getShoesStaticItemIdList();
 
-    const positions = await getPositions(game);
+    const positions = await getPositions(game, timeline);
     const champions = [];
     const teams = game.teams;
 
@@ -400,7 +400,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
   }
 }
 
-gameList(200).then((initData) => {
+gameList(1000).then((initData) => {
   if (initData.length === 0) {
     console.log('END');
     return;
@@ -454,7 +454,7 @@ gameList(200).then((initData) => {
 
         sharedData.splice(0, sharedData.length);
 
-        const newGameList = await gameList(200);
+        const newGameList = await gameList(1000);
         if (newGameList.length === 0) {
           lockReleaser();
           break;

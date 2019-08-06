@@ -183,7 +183,7 @@ export interface IGameApiData {
   gameVersion: string;
 }
 
-export interface IGameTimelineParticipantFrame {
+export interface IGameTimelineParticipantFrames {
   [id: string]: {
     participantId: number;
     position: { x: number; y: number };
@@ -234,7 +234,7 @@ export interface IGameTimelineEvent {
 }
 
 export interface IGameTimelineFrame {
-  participantFrames: IGameTimelineParticipantFrame;
+  participantFrames: IGameTimelineParticipantFrames;
   events: IGameTimelineEvent[];
   timestamp: number;
 }

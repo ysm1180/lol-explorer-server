@@ -321,7 +321,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
             const statRunes = [stats.statPerk0, stats.statPerk1, stats.statPerk2];
             const participantTimeline = participantData.timeline;
             const gameMinutes = Math.floor(game.gameDuration / 60);
-            const skills = getSkillLevelupSlots(timeline, participantId);
+            const skills = getSkillLevelupSlots(timeline, participantId).slice(0, 15);
             const items = getItemEvents(timeline, participantId).sort(
               (a, b) => a.timestamp - b.timestamp
             );
@@ -426,7 +426,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                   position,
                   gameVersion,
                   isWin,
-                  skills: skills.slice(0, 15),
+                  skills,
                 });
               }
 
@@ -441,7 +441,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                 });
               }
 
-              if (purchasedItemIds.length > 0) {
+              if (purchasedItemIds.length >= 3) {
                 await saveChampionPurchasedItems({
                   championKey,
                   tier,
@@ -513,6 +513,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                     rivals[participantId].participantId
                   ),
                 },
+                skills
               });
             }
 

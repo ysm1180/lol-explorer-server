@@ -5,9 +5,29 @@ import StatisticsChampion from '../models/statistics/champion';
 import StatisticsGame, { IStatisticsGameModel } from '../models/statistics/game';
 import StatisticsSummoner from '../models/statistics/summoner';
 import { getPositions } from '../models/util/game';
-import { getConsumedStaticItemIdList, getFinalStaticItemIdList, getShoesStaticItemIdList } from '../models/util/static';
-import { saveChampionBans, saveChampionPosition, saveChampionPurchasedItems, saveChampionRivalData, saveChampionRune, saveChampionShoes, saveChampionSkillSet, saveChampionSpell, saveChampionStartItem, saveChampionTimeWin } from '../models/util/statistics';
-import { getItemEvents, getSkillLevelupSlots, getSoloKills, getStartItemIdList } from '../models/util/timeline';
+import {
+  getConsumedStaticItemIdList,
+  getFinalStaticItemIdList,
+  getShoesStaticItemIdList,
+} from '../models/util/static';
+import {
+  saveChampionBans,
+  saveChampionPosition,
+  saveChampionPurchasedItems,
+  saveChampionRivalData,
+  saveChampionRune,
+  saveChampionShoes,
+  saveChampionSkillSet,
+  saveChampionSpell,
+  saveChampionStartItem,
+  saveChampionTimeWin,
+} from '../models/util/statistics';
+import {
+  getItemEvents,
+  getSkillLevelupSlots,
+  getSoloKills,
+  getStartItemIdList,
+} from '../models/util/timeline';
 import { Lock, LolStatisticsWrapper } from './common';
 
 const wrapper = new LolStatisticsWrapper();
@@ -166,7 +186,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
 
           const gameMinutes = Math.floor(game.gameDuration / 60);
 
-          const skills = getSkillLevelupSlots(timeline, participantId);
+          const skills = getSkillLevelupSlots(timeline, participantId).slice(0, 15);
           const items = getItemEvents(timeline, participantId).sort(
             (a, b) => a.timestamp - b.timestamp
           );
@@ -279,7 +299,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
                 position,
                 gameVersion,
                 isWin,
-                skills: skills.slice(0, 15),
+                skills,
               });
             }
 
@@ -294,7 +314,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
               });
             }
 
-            if (purchasedItemIds.length > 0) {
+            if (purchasedItemIds.length >= 3) {
               await saveChampionPurchasedItems({
                 championKey,
                 tier,
@@ -366,6 +386,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
                   rivals[participantId].participantId
                 ),
               },
+              skills,
             });
           }
 
@@ -462,7 +483,7 @@ gameList(1000).then((initData) => {
 
         sharedData.push(...newGameList);
         console.log(`NEW ADD GAME ${newGameList.length}`);
-        
+
         lockReleaser();
       }
     }

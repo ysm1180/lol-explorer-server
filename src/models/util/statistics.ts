@@ -7,6 +7,7 @@ import StatisticsChampionRivalShoes from '../statistics/champion_rival_shoes';
 import StatisticsChampionRivalSpell from '../statistics/champion_rival_spell_build';
 import StatisticsChampionRivalStartItem from '../statistics/champion_rival_start_item';
 import StatisticsChampionRivalStat from '../statistics/champion_rival_stat';
+import StatisticsChampionRivalSkillSet from '../statistics/champion_rival_skill_set';
 import StatisticsChampionRune from '../statistics/champion_rune';
 import StatisticsChampionShoes from '../statistics/champion_shoes';
 import StatisticsChampionSkillSet from '../statistics/champion_skill_set';
@@ -25,6 +26,7 @@ export async function saveChampionRivalData({
   startItems,
   shoes,
   stats,
+  skills,
 }: {
   championKey: number;
   rivalChampionKey: number;
@@ -58,6 +60,7 @@ export async function saveChampionRivalData({
     goldEarned: number;
     killPercent: number;
   };
+  skills: number[];
 }) {
   const rivalStats = await StatisticsChampionRivalStat.findOne({
     championKey,
@@ -253,6 +256,31 @@ export async function saveChampionRivalData({
         win: isWin ? 1 : 0,
         shoes: shoes.itemId,
         averageTimestamp: shoes.timestamp,
+      }).save();
+    }
+  }
+
+  if (skills.length >= 15) {
+    const skillset = await StatisticsChampionRivalSkillSet.findOne({
+      championKey,
+      position,
+      gameVersion,
+      skills,
+    });
+    if (skillset) {
+      skillset.count++;
+      if (isWin) {
+        skillset.win++;
+      }
+      await skillset.save();
+    } else {
+      await new StatisticsChampionRivalSkillSet({
+        championKey,
+        position,
+        gameVersion,
+        skills,
+        count: 1,
+        win: isWin ? 1 : 0,
       }).save();
     }
   }

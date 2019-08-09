@@ -258,6 +258,7 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
         if (!timeline) {
           const timelineData = await demacia.getMatchTimelineByGameId(gameId);
           timeline = new GameTimeline({ ...timelineData, gameId });
+          timeline.save();
         }
 
         const games = await Game.find({ gameId: Number(gameId) }).limit(1);

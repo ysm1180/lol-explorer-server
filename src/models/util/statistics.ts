@@ -7,6 +7,7 @@ import StatisticsChampionRivalShoes from '../statistics/champion_rival_shoes';
 import StatisticsChampionRivalSpell from '../statistics/champion_rival_spell_build';
 import StatisticsChampionRivalStartItem from '../statistics/champion_rival_start_item';
 import StatisticsChampionRivalStat from '../statistics/champion_rival_stat';
+import StatisticsChampionRivalSkillSet from '../statistics/champion_rival_skill_set';
 import StatisticsChampionRune from '../statistics/champion_rune';
 import StatisticsChampionShoes from '../statistics/champion_shoes';
 import StatisticsChampionSkillSet from '../statistics/champion_skill_set';
@@ -25,6 +26,7 @@ export async function saveChampionRivalData({
   startItems,
   shoes,
   stats,
+  skills,
 }: {
   championKey: number;
   rivalChampionKey: number;
@@ -58,6 +60,7 @@ export async function saveChampionRivalData({
     goldEarned: number;
     killPercent: number;
   };
+  skills: number[];
 }) {
   const rivalStats = await StatisticsChampionRivalStat.findOne({
     championKey,
@@ -112,6 +115,58 @@ export async function saveChampionRivalData({
 
     await rivalStats.save();
   } else {
+    const rivalStats = new StatisticsChampionRivalStat({
+      championKey,
+      rivalChampionKey,
+      position,
+      gameVersion,
+      count: 1,
+      win: isWin ? 1 : 0,
+      averageSoloKills: stats.soloKills,
+      averageKills: stats.kills,
+      averageDeaths: stats.deaths,
+      averageAssists: stats.assists,
+      averageDamageDealtToChampions: stats.damageDealtToChampions,
+      averageDamageTaken: stats.damageTaken,
+      averageGoldEarned: stats.goldEarned,
+      averageKillPercent: stats.killPercent,
+      xpPerMinutes: {},
+      csPerMinutes: {},
+      goldPerMinutes: {},
+    });
+
+    if (stats.csPerMinutes) {
+      for (const key in Object.keys(stats.csPerMinutes)) {
+        if (rivalStats.csPerMinutes[key]) {
+          rivalStats.csPerMinutes[key] =
+            (rivalStats.csPerMinutes[key] + stats.csPerMinutes[key]) / 2;
+        } else {
+          rivalStats.csPerMinutes[key] = stats.csPerMinutes[key];
+        }
+      }
+    }
+    if (stats.goldPerMinutes) {
+      for (const key in Object.keys(stats.goldPerMinutes)) {
+        if (rivalStats.goldPerMinutes[key]) {
+          rivalStats.goldPerMinutes[key] =
+            (rivalStats.goldPerMinutes[key] + stats.goldPerMinutes[key]) / 2;
+        } else {
+          rivalStats.goldPerMinutes[key] = stats.goldPerMinutes[key];
+        }
+      }
+    }
+    if (stats.xpPerMinutes) {
+      for (const key in Object.keys(stats.xpPerMinutes)) {
+        if (rivalStats.xpPerMinutes[key]) {
+          rivalStats.xpPerMinutes[key] =
+            (rivalStats.xpPerMinutes[key] + stats.xpPerMinutes[key]) / 2;
+        } else {
+          rivalStats.xpPerMinutes[key] = stats.xpPerMinutes[key];
+        }
+      }
+    }
+
+    await rivalStats.save();
   }
 
   const spell = await StatisticsChampionRivalSpell.findOne({
@@ -253,6 +308,31 @@ export async function saveChampionRivalData({
         win: isWin ? 1 : 0,
         shoes: shoes.itemId,
         averageTimestamp: shoes.timestamp,
+      }).save();
+    }
+  }
+
+  if (skills.length >= 15) {
+    const skillset = await StatisticsChampionRivalSkillSet.findOne({
+      championKey,
+      position,
+      gameVersion,
+      skills,
+    });
+    if (skillset) {
+      skillset.count++;
+      if (isWin) {
+        skillset.win++;
+      }
+      await skillset.save();
+    } else {
+      await new StatisticsChampionRivalSkillSet({
+        championKey,
+        position,
+        gameVersion,
+        skills,
+        count: 1,
+        win: isWin ? 1 : 0,
       }).save();
     }
   }

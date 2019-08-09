@@ -10,6 +10,8 @@ const truncateCollections = [
   'statistics_champion_rival_shoes',
   'statistics_champion_rival_spell_builds',
   'statistics_champion_rival_start_items',
+  'statistics_champion_rival_stats',
+  'statistics_champion_rival_skill_sets',
   'statistics_champion_runes',
   'statistics_champion_shoes',
   'statistics_champion_skill_sets',

@@ -193,6 +193,8 @@ export function getStartItemIdList(timeline: IGameTimelineApiData, participantId
     }
   }
 
+  result.sort((a, b) => a - b);
+  
   return result;
 }
 

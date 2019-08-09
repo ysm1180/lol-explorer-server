@@ -84,11 +84,14 @@ export interface IItemDataDragon {
   description: string;
   colloq: string;
   plaintext: string;
-  into: number[];
+  from?: string[];
+  into?: string[];
   image: ImageDataDragon;
   gold: IItemCostDataDragon;
   tags: string[];
   maps: { [mapId: string]: boolean };
   stats: IItemStatsDataDragon;
   id: number;
+  consumed?: boolean;
+  requiredAlly? : string;
 }

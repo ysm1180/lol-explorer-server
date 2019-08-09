@@ -1,13 +1,8 @@
-import axios from 'axios';
-import * as express from 'express';
-import mongo from '../db/mongo';
 import { Demacia } from '../lib/demacia/demacia';
-import DevApi from '../models/statistics/api';
 import StatisticsSummoner from '../models/statistics/summoner';
-import devApi, { IDevApiClassData } from './api';
+import { LolStatisticsWrapper } from './common';
 
-const app = express();
-mongo.connect();
+const wrapper = new LolStatisticsWrapper();
 
 const insertHighRankSummonerList = async (demacia: Demacia) => {
   try {
@@ -84,46 +79,36 @@ const getSummonerList = async (
   }
 };
 
-DevApi.find().then(async (data) => {
-  try {
-    const queues: ('RANKED_SOLO_5x5' | 'RANKED_FLEX_SR')[] = ['RANKED_SOLO_5x5', 'RANKED_FLEX_SR'];
-    const tiers = ['DIAMOND', 'PLATINUM'];
-    const ranks = ['I', 'II', 'III', 'IV'];
+StatisticsSummoner.remove({}).then(() => {
+  const queues: ('RANKED_SOLO_5x5' | 'RANKED_FLEX_SR')[] = ['RANKED_SOLO_5x5', 'RANKED_FLEX_SR'];
+  const tiers = ['DIAMOND', 'PLATINUM'];
+  const ranks = ['I', 'II', 'III', 'IV'];
 
-    const progressData: any[] = [];
-    for (let i = 0; i < queues.length; i++) {
-      const queue = queues[i];
+  const progressData: any[] = [];
+  for (let i = 0; i < queues.length; i++) {
+    const queue = queues[i];
 
-      for (let j = 0; j < tiers.length; j++) {
-        const tier = tiers[j];
+    for (let j = 0; j < tiers.length; j++) {
+      const tier = tiers[j];
 
-        for (let k = 0; k < ranks.length; k++) {
-          const rank = ranks[k];
-          progressData.push({
-            queue,
-            tier,
-            rank,
-            page: 1,
-          });
-        }
+      for (let k = 0; k < ranks.length; k++) {
+        const rank = ranks[k];
+        progressData.push({
+          queue,
+          tier,
+          rank,
+          page: 1,
+        });
       }
     }
+  }
 
-    const keys = data.map((k) => k.key);
-    devApi.setExpiredFn(async (key: string) => {
-      try {
-        await axios.post('http://localhost:5555/expired', { api_key: key });
-        console.log(`EXPIRED ${key}`);
-        devApi.removeKey(key);
-      } catch (err) {
-        console.log(`Expired function error ${err}`);
-      }
-    });
-    devApi.setSharedData({
+  wrapper.run(
+    {
       insertedHighRanks: false,
       pageData: progressData,
-    });
-    devApi.setProcessFunction(async (sharedData: any, apiClassData: IDevApiClassData) => {
+    },
+    async (sharedData: any, apiClassData) => {
       try {
         if (!sharedData.insertedHighRanks) {
           sharedData.insertedHighRanks = true;
@@ -153,13 +138,14 @@ DevApi.find().then(async (data) => {
               }
             }
           } catch (err) {
+            if (err.response && err.response.status === 403) {
+              return Promise.reject(err);
+            }
             console.log(err);
           }
-          
+
           pageData = sharedData.pageData.filter((data: { page: number }) => data.page !== -1);
         }
-
-        console.log('END');
       } catch (err) {
         if (err.response && err.response.status === 403) {
           return Promise.reject(err);
@@ -171,15 +157,6 @@ DevApi.find().then(async (data) => {
           console.error(err);
         }
       }
-    });
-
-    await StatisticsSummoner.remove({});
-    await devApi.runAll(keys);
-    return;
-  } catch (err) {
-    return Promise.reject(err);
-  }
+    }
+  );
 });
-
-var port = process.env.PORT || 6667;
-app.listen(port);

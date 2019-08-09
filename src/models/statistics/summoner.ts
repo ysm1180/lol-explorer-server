@@ -5,6 +5,7 @@ export interface IStatisticsSummonerModel extends Document {
   queue: string;
   tier: string;
   rank: string;
+  isReady: boolean;
 }
 
 var summonerSchema = new Schema({
@@ -12,6 +13,7 @@ var summonerSchema = new Schema({
   queue: String,
   tier: String,
   rank: String,
+  isReady: Boolean,
 });
 
 export default model<IStatisticsSummonerModel>('statistics_summoner', summonerSchema);

@@ -339,8 +339,8 @@ function downloadStaticDataFiles(version: string, dest: string) {
                 {
                   id: 5001,
                   key: 'HealthScaling',
-                  name: '체력 (레벨에 비례)',
-                  shortDesc: '체력 +15~90',
+                  name: '체력',
+                  shortDesc: '체력 +15~90 (레벨에 비례)',
                   icon: 'perk-images/StatMods/StatModsHealthScalingIcon.png',
                 },
                 {
@@ -367,8 +367,8 @@ function downloadStaticDataFiles(version: string, dest: string) {
                 {
                   id: 5007,
                   key: 'CDRScaling',
-                  name: '재사용 대기시간 감소 (레벨에 비례)',
-                  shortDesc: '재사용 대기시간 감소 +1~10%',
+                  name: '재사용 대기시간 감소',
+                  shortDesc: '재사용 대기시간 감소 +1~10% (레벨에 비례)',
                   icon: 'perk-images/StatMods/StatModsCDRScalingIcon.png',
                 },
                 {

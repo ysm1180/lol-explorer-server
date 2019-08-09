@@ -148,6 +148,9 @@ export interface IGameParticipantData {
     statPerk2: number;
   };
   timeline: {
+    creepsPerMinDeltas?: { [duration: string]: number };
+    xpPerMinDeltas?: { [duration: string]: number };
+    goldPerMinDeltas?: { [duration: string]: number };
     participantId: number;
     role: string;
     lane: 'TOP' | 'MID' | 'MIDDLE' | 'JUNGLE' | 'BOTTOM' | 'NONE';
@@ -180,7 +183,7 @@ export interface IGameApiData {
   gameVersion: string;
 }
 
-export interface IGameTimelineParticipantFrame {
+export interface IGameTimelineParticipantFrames {
   [id: string]: {
     participantId: number;
     position: { x: number; y: number };
@@ -231,7 +234,7 @@ export interface IGameTimelineEvent {
 }
 
 export interface IGameTimelineFrame {
-  participantFrames: IGameTimelineParticipantFrame;
+  participantFrames: IGameTimelineParticipantFrames;
   events: IGameTimelineEvent[];
   timestamp: number;
 }

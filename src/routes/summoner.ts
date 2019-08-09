@@ -6,6 +6,7 @@ import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import { IMatchApiData } from '../lib/demacia/models';
 import Game, { IGameModel } from '../models/game';
 import GameChampion, { IGameChampionModel } from '../models/game-champion';
+import GameTimeline from '../models/game-timeline';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
 import { updateChampionAnalysisByGame } from '../models/util/game';
@@ -111,14 +112,6 @@ router.post('/:name', async function(req, res, next) {
       success: true,
       updatedMatchCount: insertMatchDataList.length,
     });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get('/matches/test/:accountId', async function(req, res, next) {
-  try {
-    res.json(await getMatchListExactly(req.params.accountId, 0, 100));
   } catch (err) {
     next(err);
   }
@@ -261,13 +254,19 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
       const gameModels: IGameModel[] = [];
       for (let i = 0; i < matchList.length; i++) {
         const gameId = matchList[i].gameId;
+        let timeline = await GameTimeline.findOne({ gameId });
+        if (!timeline) {
+          const timelineData = await demacia.getMatchTimelineByGameId(gameId);
+          timeline = new GameTimeline({ ...timelineData, gameId });
+        }
+
         const games = await Game.find({ gameId: Number(gameId) }).limit(1);
         if (games.length === 0) {
           const data = await demacia.getMatchInfoByGameId(gameId);
           const game = new Game(data);
           game.save();
 
-          updateChampionAnalysisByGame(game);
+          updateChampionAnalysisByGame(game, timeline);
 
           gameModels.push(game);
         } else {

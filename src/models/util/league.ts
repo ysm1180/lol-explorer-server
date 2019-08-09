@@ -10,8 +10,10 @@ export async function getOrCreateLeagueData(summonerId: string, lastSeason: numb
       for (var i = 0; i < leagueDataList.length; i++) {
         leagueDataList[i].season = lastSeason;
       }
-      const docs = await League.collection.insertMany(leagueDataList);
-      leagueList = docs.ops;
+      if (leagueDataList.length) {
+        const docs = await League.collection.insertMany(leagueDataList);
+        leagueList = docs.ops;
+      }
     }
 
     return Promise.resolve(leagueList);
@@ -28,15 +30,17 @@ export async function updateLeageData(summonerId: string, lastSeason: number) {
       leagueDataList[i].season = lastSeason;
     }
 
-    await League.bulkWrite(
-      leagueDataList.map((league) => ({
-        updateOne: {
-          filter: { summonerId: league.summonerId, season: lastSeason, leagueId: league.leagueId },
-          update: { $set: league },
-          upsert: true,
-        },
-      }))
-    );
+    if (leagueDataList.length > 0) {
+      await League.bulkWrite(
+        leagueDataList.map((league) => ({
+          updateOne: {
+            filter: { summonerId: league.summonerId, season: lastSeason, leagueId: league.leagueId },
+            update: { $set: league },
+            upsert: true,
+          },
+        }))
+      );
+    }
 
     return Promise.resolve(leagueDataList);
   } catch (err) {

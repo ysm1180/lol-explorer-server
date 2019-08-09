@@ -1,4 +1,4 @@
-import mongo from '../src/db/mongo';
+import mongo from '../../db/mongo';
 
 // mongo db
 const truncateCollections = ['summoners', 'leagues', 'matches', 'games', 'game_champions'];

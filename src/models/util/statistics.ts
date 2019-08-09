@@ -115,6 +115,58 @@ export async function saveChampionRivalData({
 
     await rivalStats.save();
   } else {
+    const rivalStats = new StatisticsChampionRivalStat({
+      championKey,
+      rivalChampionKey,
+      position,
+      gameVersion,
+      count: 1,
+      win: isWin ? 1 : 0,
+      averageSoloKills: stats.soloKills,
+      averageKills: stats.kills,
+      averageDeaths: stats.deaths,
+      averageAssists: stats.assists,
+      averageDamageDealtToChampions: stats.damageDealtToChampions,
+      averageDamageTaken: stats.damageTaken,
+      averageGoldEarned: stats.goldEarned,
+      averageKillPercent: stats.killPercent,
+      xpPerMinutes: {},
+      csPerMinutes: {},
+      goldPerMinutes: {},
+    });
+
+    if (stats.csPerMinutes) {
+      for (const key in Object.keys(stats.csPerMinutes)) {
+        if (rivalStats.csPerMinutes[key]) {
+          rivalStats.csPerMinutes[key] =
+            (rivalStats.csPerMinutes[key] + stats.csPerMinutes[key]) / 2;
+        } else {
+          rivalStats.csPerMinutes[key] = stats.csPerMinutes[key];
+        }
+      }
+    }
+    if (stats.goldPerMinutes) {
+      for (const key in Object.keys(stats.goldPerMinutes)) {
+        if (rivalStats.goldPerMinutes[key]) {
+          rivalStats.goldPerMinutes[key] =
+            (rivalStats.goldPerMinutes[key] + stats.goldPerMinutes[key]) / 2;
+        } else {
+          rivalStats.goldPerMinutes[key] = stats.goldPerMinutes[key];
+        }
+      }
+    }
+    if (stats.xpPerMinutes) {
+      for (const key in Object.keys(stats.xpPerMinutes)) {
+        if (rivalStats.xpPerMinutes[key]) {
+          rivalStats.xpPerMinutes[key] =
+            (rivalStats.xpPerMinutes[key] + stats.xpPerMinutes[key]) / 2;
+        } else {
+          rivalStats.xpPerMinutes[key] = stats.xpPerMinutes[key];
+        }
+      }
+    }
+
+    await rivalStats.save();
   }
 
   const spell = await StatisticsChampionRivalSpell.findOne({

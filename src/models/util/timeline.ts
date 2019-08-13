@@ -65,23 +65,26 @@ export function getLanesByCoor(timeline: IGameTimelineApiData, participantId: nu
   const result: string[] = [];
   for (let i = 1; i < 11; i++) {
     const frame = frames[i];
-    for (const key in frame.participantFrames) {
-      if (frame.participantFrames[key].participantId === participantId) {
-        const coors = [
-          frame.participantFrames[key].position.x,
-          frame.participantFrames[key].position.y,
-        ];
-        let position = 'UNKNOWN';
-        if (containPoint(JUNGLE_1, coors) || containPoint(JUNGLE_2, coors)) {
-          position = 'JUNGLE';
-        } else if (containPoint(MID_LANE, coors)) {
-          position = 'MID';
-        } else if (containPoint(TOP_LANE, coors)) {
-          position = 'TOP';
-        } else if (containPoint(BOT_LANE, coors)) {
-          position = 'BOTTOM';
+
+    if (frame) {
+      for (const key in frame.participantFrames) {
+        if (frame.participantFrames[key].participantId === participantId && frame.participantFrames[key].position) {
+          const coors = [
+            frame.participantFrames[key].position.x,
+            frame.participantFrames[key].position.y,
+          ];
+          let position = 'UNKNOWN';
+          if (containPoint(JUNGLE_1, coors) || containPoint(JUNGLE_2, coors)) {
+            position = 'JUNGLE';
+          } else if (containPoint(MID_LANE, coors)) {
+            position = 'MID';
+          } else if (containPoint(TOP_LANE, coors)) {
+            position = 'TOP';
+          } else if (containPoint(BOT_LANE, coors)) {
+            position = 'BOTTOM';
+          }
+          result.push(position);
         }
-        result.push(position);
       }
     }
   }

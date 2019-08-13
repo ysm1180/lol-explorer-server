@@ -504,7 +504,7 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
                   csPerMinutes: participantData.timeline.creepsPerMinDeltas,
                   xpPerMinutes: participantData.timeline.xpPerMinDeltas,
                   goldPerMinutes: participantData.timeline.goldPerMinDeltas,
-                  killPercent:
+                  killPercent: totalKillsByTeam[teamId] === 0 ? 0 :
                     (participantData.stats.kills + participantData.stats.assists) /
                     totalKillsByTeam[teamId],
                   soloKills: getSoloKills(
@@ -530,10 +530,8 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
         }
       }
 
-      game.isReady = true;
 
       await StatisticsChampion.insertMany(champions);
-      await game.save();
     }
 
     return Promise.resolve(true);
@@ -545,9 +543,9 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       console.log(err);
     }
 
-    game.isReady = false;
-    await game.save();
-
     return Promise.reject(err);
+  } finally {
+    game.isReady = true;
+    await game.save();
   }
 }

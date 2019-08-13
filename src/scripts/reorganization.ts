@@ -377,7 +377,7 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
                 csPerMinutes: participantData.timeline.creepsPerMinDeltas,
                 xpPerMinutes: participantData.timeline.xpPerMinDeltas,
                 goldPerMinutes: participantData.timeline.goldPerMinDeltas,
-                killPercent:
+                killPercent: totalKillsByTeam[teamId] === 0 ? 0 :
                   (participantData.stats.kills + participantData.stats.assists) /
                   totalKillsByTeam[teamId],
                 soloKills: getSoloKills(
@@ -409,14 +409,18 @@ async function start(demacia: Demacia, game: IStatisticsGameModel) {
     }
 
     await StatisticsChampion.insertMany(champions);
-    gameModel.isReady = true;
 
     return Promise.resolve();
   } catch (err) {
-    gameModel.isReady = false;
+    if (err.response) {
+      console.log(err.response.data);
+    } else {
+      console.log(err);
+    }
 
     return Promise.reject(err);
   } finally {
+    gameModel.isReady = true;
     await gameModel.save();
   }
 }
@@ -460,6 +464,8 @@ gameList(1000).then((initData) => {
               unselectedList[idx].selected = false;
               return Promise.reject(err);
             }
+
+            console.log(err);
           }
         }
 

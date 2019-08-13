@@ -83,7 +83,7 @@ export async function saveChampionRivalData({
     rivalStats.averageGoldEarned = (rivalStats.averageGoldEarned + stats.goldEarned) / 2;
     rivalStats.averageKillPercent = (rivalStats.averageKillPercent + stats.killPercent) / 2;
     if (stats.csPerMinutes) {
-      for (const key in Object.keys(stats.csPerMinutes)) {
+      for (const key of Object.keys(stats.csPerMinutes)) {
         if (rivalStats.csPerMinutes[key]) {
           rivalStats.csPerMinutes[key] =
             (rivalStats.csPerMinutes[key] + stats.csPerMinutes[key]) / 2;
@@ -93,7 +93,7 @@ export async function saveChampionRivalData({
       }
     }
     if (stats.goldPerMinutes) {
-      for (const key in Object.keys(stats.goldPerMinutes)) {
+      for (const key of Object.keys(stats.goldPerMinutes)) {
         if (rivalStats.goldPerMinutes[key]) {
           rivalStats.goldPerMinutes[key] =
             (rivalStats.goldPerMinutes[key] + stats.goldPerMinutes[key]) / 2;
@@ -103,7 +103,7 @@ export async function saveChampionRivalData({
       }
     }
     if (stats.xpPerMinutes) {
-      for (const key in Object.keys(stats.xpPerMinutes)) {
+      for (const key of Object.keys(stats.xpPerMinutes)) {
         if (rivalStats.xpPerMinutes[key]) {
           rivalStats.xpPerMinutes[key] =
             (rivalStats.xpPerMinutes[key] + stats.xpPerMinutes[key]) / 2;
@@ -136,7 +136,7 @@ export async function saveChampionRivalData({
     });
 
     if (stats.csPerMinutes) {
-      for (const key in Object.keys(stats.csPerMinutes)) {
+      for (const key of Object.keys(stats.csPerMinutes)) {
         if (rivalStats.csPerMinutes[key]) {
           rivalStats.csPerMinutes[key] =
             (rivalStats.csPerMinutes[key] + stats.csPerMinutes[key]) / 2;
@@ -146,7 +146,7 @@ export async function saveChampionRivalData({
       }
     }
     if (stats.goldPerMinutes) {
-      for (const key in Object.keys(stats.goldPerMinutes)) {
+      for (const key of Object.keys(stats.goldPerMinutes)) {
         if (rivalStats.goldPerMinutes[key]) {
           rivalStats.goldPerMinutes[key] =
             (rivalStats.goldPerMinutes[key] + stats.goldPerMinutes[key]) / 2;
@@ -156,7 +156,7 @@ export async function saveChampionRivalData({
       }
     }
     if (stats.xpPerMinutes) {
-      for (const key in Object.keys(stats.xpPerMinutes)) {
+      for (const key of Object.keys(stats.xpPerMinutes)) {
         if (rivalStats.xpPerMinutes[key]) {
           rivalStats.xpPerMinutes[key] =
             (rivalStats.xpPerMinutes[key] + stats.xpPerMinutes[key]) / 2;

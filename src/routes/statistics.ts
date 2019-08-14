@@ -2,18 +2,15 @@ import { Router } from 'express';
 import demacia from '../common/demacia';
 import { POSITION, RIFT_POSITION } from '../lib/demacia/constants';
 import Game from '../models/game';
+import GameTimeline from '../models/game-timeline';
 import Champion from '../models/static/champion';
 import Spell from '../models/static/spell';
-import StatisticsChampions from '../models/statistics/champion';
-import StatisticsChampionStartItem from '../models/statistics/champion_start_item';
 import StatisticsChampionPosition from '../models/statistics/champion_position';
+import StatisticsChampionRivalStat from '../models/statistics/champion_rival_stat';
+import StatisticsChampionRune from '../models/statistics/champion_rune';
 import StatisticsChampionSpell from '../models/statistics/champion_spell';
-import {
-  getPredictPositions,
-  IParticipantPositionData,
-  updateChampionAnalysisByGame,
-} from '../models/util/game';
-import GameTimeline from '../models/game-timeline';
+import StatisticsChampionStartItem from '../models/statistics/champion_start_item';
+import { getPredictPositions, IParticipantPositionData, updateChampionAnalysisByGame } from '../models/util/game';
 import { getMostFrequentLane } from '../models/util/timeline';
 
 const router = Router();
@@ -118,9 +115,6 @@ router.get('/champion/spells/:championId/:positionId', async function(req, res, 
           count: -1,
         },
       },
-      {
-        $limit: 2,
-      },
     ]);
 
     res.json(arr);
@@ -210,7 +204,7 @@ router.get('/champion/startitems/:championId/:positionId', async function(req, r
   }
 });
 
-router.get('/champion/perks/:championId/:positionId', async function(req, res, next) {
+router.get('/champion/easys/:championId/:positionId', async function(req, res, next) {
   try {
     const championId = Number(req.params.championId);
     const positionId = Number(req.params.positionId);
@@ -236,7 +230,7 @@ router.get('/champion/perks/:championId/:positionId', async function(req, res, n
       return;
     }
 
-    const arr = await StatisticsChampions.aggregate([
+    const arr = await StatisticsChampionRivalStat.aggregate([
       {
         $match: {
           championKey: championId,
@@ -244,87 +238,20 @@ router.get('/champion/perks/:championId/:positionId', async function(req, res, n
         },
       },
       {
-        $unwind: {
-          path: '$stats',
-        },
-      },
-      {
-        $facet: {
-          totalCount: [
-            {
-              $count: 'value',
-            },
-          ],
-          pipelineResults: [
-            {
-              $project: {
-                _id: 1,
-                championKey: 1,
-                stats: 1,
-                isWin: 1,
-              },
-            },
-          ],
-        },
-      },
-      {
-        $unwind: {
-          path: '$pipelineResults',
-        },
-      },
-      {
-        $unwind: {
-          path: '$totalCount',
-        },
-      },
-      {
-        $replaceRoot: {
-          newRoot: {
-            $mergeObjects: [
-              '$pipelineResults',
-              {
-                totalCount: '$totalCount.value',
-              },
-            ],
-          },
-        },
-      },
-      {
         $group: {
-          _id: {
-            perkPrimaryStyle: '$stats.perkPrimaryStyle',
-            perkSubStyle: '$stats.perkSubStyle',
-          },
+          _id: '$rivalChampionKey',
           count: {
-            $sum: 1,
+            $sum: '$count',
           },
           win: {
-            $sum: {
-              $cond: {
-                if: {
-                  $eq: ['$isWin', true],
-                },
-                then: 1,
-                else: 0,
-              },
-            },
-          },
-          totalCount: {
-            $min: '$totalCount',
+            $sum: '$win',
           },
         },
       },
       {
         $project: {
           count: 1,
-          pick_rate: {
-            $multiply: [
-              {
-                $divide: ['$count', '$totalCount'],
-              },
-              100,
-            ],
-          },
+          win: 1,
           win_rate: {
             $multiply: [
               {
@@ -336,13 +263,18 @@ router.get('/champion/perks/:championId/:positionId', async function(req, res, n
         },
       },
       {
+        $match: {
+          count: { $gt: 10 },
+          win_rate: { $gte: 50 },
+        },
+      },
+      {
         $sort: {
-          pick_rate: -1,
           win_rate: -1,
         },
       },
       {
-        $limit: 2,
+        $limit: 6,
       },
     ]);
 
@@ -352,7 +284,7 @@ router.get('/champion/perks/:championId/:positionId', async function(req, res, n
   }
 });
 
-router.get('/champion/perk/:championId/:positionId/:primary/:sub', async function(req, res, next) {
+router.get('/champion/counters/:championId/:positionId', async function(req, res, next) {
   try {
     const championId = Number(req.params.championId);
     const positionId = Number(req.params.positionId);
@@ -378,100 +310,28 @@ router.get('/champion/perk/:championId/:positionId/:primary/:sub', async functio
       return;
     }
 
-    const arr = await StatisticsChampions.aggregate([
+    const arr = await StatisticsChampionRivalStat.aggregate([
       {
         $match: {
           championKey: championId,
-        },
-      },
-      {
-        $unwind: {
-          path: '$stats',
-        },
-      },
-      {
-        $facet: {
-          totalCount: [
-            {
-              $count: 'value',
-            },
-          ],
-          pipelineResults: [
-            {
-              $project: {
-                _id: 1,
-                championKey: 1,
-                stats: 1,
-                isWin: 1,
-              },
-            },
-          ],
-        },
-      },
-      {
-        $unwind: {
-          path: '$pipelineResults',
-        },
-      },
-      {
-        $unwind: {
-          path: '$totalCount',
-        },
-      },
-      {
-        $replaceRoot: {
-          newRoot: {
-            $mergeObjects: [
-              '$pipelineResults',
-              {
-                totalCount: '$totalCount.value',
-              },
-            ],
-          },
+          position: positionId,
         },
       },
       {
         $group: {
-          _id: {
-            perk0: '$stats.perk0',
-            perk1: '$stats.perk1',
-            perk2: '$stats.perk2',
-            perk3: '$stats.perk3',
-            perk4: '$stats.perk4',
-            statPerk0: '$stats.statPerk0',
-            statPerk1: '$stats.statPerk1',
-            statPerk2: '$stats.statPerk2',
-          },
+          _id: '$rivalChampionKey',
           count: {
-            $sum: 1,
+            $sum: '$count',
           },
           win: {
-            $sum: {
-              $cond: {
-                if: {
-                  $eq: ['$isWin', true],
-                },
-                then: 1,
-                else: 0,
-              },
-            },
-          },
-          totalCount: {
-            $min: '$totalCount',
+            $sum: '$win',
           },
         },
       },
       {
         $project: {
           count: 1,
-          pick_rate: {
-            $multiply: [
-              {
-                $divide: ['$count', '$totalCount'],
-              },
-              100,
-            ],
-          },
+          win: 1,
           win_rate: {
             $multiply: [
               {
@@ -483,13 +343,150 @@ router.get('/champion/perk/:championId/:positionId/:primary/:sub', async functio
         },
       },
       {
-        $sort: {
-          pick_rate: -1,
-          win_rate: -1,
+        $match: {
+          count: { $gt: 10 },
+          win_rate: { $lt: 50 },
         },
       },
       {
-        $limit: 2,
+        $sort: {
+          win_rate: 1,
+        },
+      },
+      {
+        $limit: 6,
+      },
+    ]);
+
+    res.json(arr);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/champion/runes/:championId/:positionId', async function(req, res, next) {
+  try {
+    const championId = Number(req.params.championId);
+    const positionId = Number(req.params.positionId);
+
+    if (positionId < POSITION.TOP || positionId > POSITION.SUPPORT) {
+      res.status(400).json({
+        status: {
+          message: 'Position id should be gratter than 0 and less than 6.',
+          status_code: 400,
+        },
+      });
+      return;
+    }
+
+    const champion = await Champion.findOne({ key: championId });
+    if (!champion) {
+      res.status(404).json({
+        status: {
+          message: 'Champion id does not exist.',
+          status_code: 404,
+        },
+      });
+      return;
+    }
+
+    const arr = await StatisticsChampionRune.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: {
+            mainRuneStyle: '$mainRuneStyle',
+            mainRune: {
+              $arrayElemAt: ['$mainRunes', 0],
+            },
+            subRuneStyle: '$subRuneStyle',
+          },
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+        },
+      },
+    ]);
+
+    res.json(arr);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/champion/rune/:championId/:positionId/:mainRune/:subRuneStyle', async function(
+  req,
+  res,
+  next
+) {
+  try {
+    const championId = Number(req.params.championId);
+    const positionId = Number(req.params.positionId);
+    const mainRune = Number(req.params.mainRune);
+    const subRuneStyle = Number(req.params.subRuneStyle);
+
+    if (positionId < POSITION.TOP || positionId > POSITION.SUPPORT) {
+      res.status(400).json({
+        status: {
+          message: 'Position id should be gratter than 0 and less than 6.',
+          status_code: 400,
+        },
+      });
+      return;
+    }
+
+    const champion = await Champion.findOne({ key: championId });
+    if (!champion) {
+      res.status(404).json({
+        status: {
+          message: 'Champion id does not exist.',
+          status_code: 404,
+        },
+      });
+      return;
+    }
+
+    const arr = await StatisticsChampionRune.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+          'mainRunes.0': mainRune,
+          subRuneStyle: subRuneStyle,
+        },
+      },
+      {
+        $group: {
+          _id: {
+            mainRunes: '$mainRunes',
+            subRunes: '$subRunes',
+            statRunes: '$statRunes',
+          },
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+        },
       },
     ]);
 

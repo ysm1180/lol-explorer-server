@@ -42,12 +42,26 @@ export class Demacia {
   public getMatchListByAccountId(
     accountId: string,
     beginIndex: number = 0,
-    endIndex: number = 100
+    endIndex: number = 100,
   ) {
     return this.call<{ matches: IMatchApiData[] }>(
       `${
         this.baseUrl
       }/match/v4/matchlists/by-account/${accountId}?beginIndex=${beginIndex}&endIndex=${endIndex}`
+    );
+  }
+
+  public getMatchQueueListByAccountId(
+    accountId: string,
+    season: number,
+    queue: number,
+    beginIndex: number = 0,
+    endIndex: number = 100,
+  ) {
+    return this.call<{ matches: IMatchApiData[] }>(
+      `${
+        this.baseUrl
+      }/match/v4/matchlists/by-account/${accountId}?season=${season}&queue=${queue}&beginIndex=${beginIndex}&endIndex=${endIndex}`
     );
   }
 

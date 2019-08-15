@@ -1,17 +1,17 @@
 import * as express from 'express';
 import * as lodash from 'lodash';
 import demacia from '../common/demacia';
-import { GAME_QUEUE_ID, MAP_ID } from '../lib/demacia/constants';
+import { GAME_QUEUE_ID, LEAGUE_QUEUE_TYPE, MAP_ID } from '../lib/demacia/constants';
 import { DDragonHelper } from '../lib/demacia/data-dragon/ddragon-helper';
 import { IMatchApiData } from '../lib/demacia/models';
-import Game, { IGameModel } from '../models/game';
+import Game from '../models/game';
 import GameChampion, { IGameChampionModel } from '../models/game-champion';
 import GameTimeline from '../models/game-timeline';
 import Match from '../models/match';
 import Summoner from '../models/summoner';
 import { updateChampionAnalysisByGame } from '../models/util/game';
 import * as league from '../models/util/league';
-import { getMatchListExactly, getMatchListRecentlyAll } from '../models/util/match';
+import { getMatchListExactly, getMatchListRecentlyAll, getUnrankedMatchListToBeInserted } from '../models/util/match';
 import { IGameClientData, IGameParticipantClientData, IGamePlayerClientData, IGameTeamClientData } from './models/game';
 import { IRiftGamesChampionClinetData, IRiftSummonerChampionClinetData } from './models/rift-champion';
 
@@ -117,6 +117,260 @@ router.post('/:name', async function(req, res, next) {
   }
 });
 
+router.get('/matches/unranked/:accountId/:queueId/', async function(req, res, next) {
+  try {
+    const accountId = String(req.params.accountId);
+    const queueId = Number(req.params.queueId);
+
+    if (queueId !== 420 && queueId !== 440) {
+      res.status(400).json({
+        status: {
+          message: 'queue should be rank.',
+          status_code: 400,
+        },
+      });
+      return;
+    }
+
+    let summoner = await Summoner.findOne({
+      accountId: accountId,
+    });
+    if (!summoner) {
+      let summonerData = await demacia.getSummonerByAccountId(accountId);
+      summoner = new Summoner(summonerData);
+      summoner.save();
+    }
+    const lastSeasonNumber = await DDragonHelper.getLatestSeason();
+    const seasons = await league.getOrCreateLeagueData(summoner.id, lastSeasonNumber);
+    const season = seasons.find((season) => season.queueType === LEAGUE_QUEUE_TYPE[queueId]);
+    if (season) {
+      res.status(400).json({
+        status: {
+          message: 'This api should be called for unranked tier.',
+          status_code: 400,
+        },
+      });
+      return;
+    }
+
+    const items = (await Match.find({
+      summonerAccountId: accountId,
+      queue: queueId,
+      season: lastSeasonNumber,
+    }).lean()) as IMatchApiData[];
+
+    if (items.length > 10) {
+      res.status(400).json({
+        status: {
+          message: 'This api should be called for unranked tier.',
+          status_code: 400,
+        },
+      });
+      return;
+    }
+
+    let matchList = items;
+    const matchListData = await getUnrankedMatchListToBeInserted(
+      accountId,
+      lastSeasonNumber,
+      queueId
+    );
+    if (matchListData.length > 0) {
+      await Match.collection.insertMany(matchListData);
+      matchList.push(...matchListData);
+    }
+
+    if (matchList.length > 0) {
+      const promises = [];
+      for (let i = 0; i < matchList.length; i++) {
+        const gameId = matchList[i].gameId;
+
+        promises.push(
+          GameTimeline.findOne({ gameId }).then(async (timeline) => {
+            if (!timeline) {
+              const timelineData = await demacia.getMatchTimelineByGameId(gameId);
+              timeline = new GameTimeline({ ...timelineData, gameId });
+              timeline.save();
+            }
+
+            return Game.find({ gameId: Number(gameId) })
+              .limit(1)
+              .then(async (games) => {
+                if (games.length === 0) {
+                  const data = await demacia.getMatchInfoByGameId(gameId);
+                  const game = new Game(data);
+                  game.save();
+
+                  updateChampionAnalysisByGame(game, timeline!);
+
+                  return game;
+                } else {
+                  return games[0];
+                }
+              });
+          })
+        );
+      }
+
+      const gameModels = await Promise.all(promises);
+
+      const result: Object[] = [];
+      matchList.forEach((match, idx) => {
+        const data = { ...match };
+        const gameClientData: IGameClientData = {
+          gameDuration: 0,
+          mapId: 0,
+          requester: { isWin: false, teamId: 0, participantId: 0 },
+          teams: {},
+        };
+        const originalGameData = gameModels[idx];
+
+        gameClientData.gameDuration = originalGameData.gameDuration;
+        gameClientData.mapId = originalGameData.mapId;
+        originalGameData.teams.forEach((team) => {
+          const data: IGameTeamClientData = {} as any;
+
+          data.isWin = team.win === 'Win' ? true : false;
+          data.teamId = team.teamId;
+          data.towerKills = team.towerKills;
+          data.dragonKills = team.dragonKills;
+          data.baronKills = team.baronKills;
+          data.firstBlood = team.firstBlood;
+          data.participants = {};
+          data.totalKills = 0;
+          data.totalDeaths = 0;
+          data.totalAssists = 0;
+
+          gameClientData.teams[data.teamId] = data;
+        });
+
+        const playerInfoList: { [id: string]: IGamePlayerClientData } = {};
+        originalGameData.participantIdentities.forEach((participantIdentity) => {
+          const player: IGamePlayerClientData = {} as any;
+
+          const {
+            accountId,
+            summonerId,
+            summonerName,
+            profileIcon,
+            platformId,
+          } = participantIdentity.player;
+          player.accountId = accountId;
+          player.summonerId = summonerId;
+          player.summonerName = summonerName;
+          player.platformId = platformId;
+          player.profileIcon = profileIcon;
+
+          playerInfoList[participantIdentity.participantId] = player;
+
+          if (accountId === req.params.accountId) {
+            gameClientData.requester.participantId = participantIdentity.participantId;
+          }
+        });
+
+        originalGameData.participants.forEach((participant) => {
+          const participantClinetData: IGameParticipantClientData = {} as any;
+
+          const { item0, item1, item2, item3, item4, item5, item6 } = participant.stats;
+          const { spell1Id, spell2Id } = participant;
+          participantClinetData.player = playerInfoList[participant.participantId];
+          participantClinetData.teamId = participant.teamId;
+          participantClinetData.championId = participant.championId;
+          participantClinetData.items = [item0, item1, item2, item3, item4, item5, item6];
+          participantClinetData.spells = [spell1Id, spell2Id];
+          participantClinetData.stats = {} as any;
+
+          const {
+            kills,
+            deaths,
+            assists,
+            doubleKills,
+            tripleKills,
+            quadraKills,
+            pentaKills,
+            totalDamageDealt,
+            trueDamageDealt,
+            totalDamageDealtToChampions,
+            trueDamageDealtToChampions,
+            totalHeal,
+            visionScore,
+            totalDamageTaken,
+            trueDamageTaken,
+            goldEarned,
+            turretKills,
+            totalMinionsKilled,
+            neutralMinionsKilled,
+            neutralMinionsKilledTeamJungle,
+            neutralMinionsKilledEnemyJungle,
+            champLevel,
+            firstBloodKill,
+            firstTowerKill,
+            perkPrimaryStyle,
+            perkSubStyle,
+            perk0,
+            perk1,
+            perk2,
+            perk3,
+            perk4,
+            perk5,
+            statPerk0,
+            statPerk1,
+            statPerk2,
+          } = participant.stats;
+          participantClinetData.stats.kills = kills;
+          participantClinetData.stats.deaths = deaths;
+          participantClinetData.stats.assists = assists;
+          participantClinetData.stats.doubleKills = doubleKills;
+          participantClinetData.stats.tripleKills = tripleKills;
+          participantClinetData.stats.quadraKills = quadraKills;
+          participantClinetData.stats.pentaKills = pentaKills;
+          participantClinetData.stats.totalDamageDealt = totalDamageDealt;
+          participantClinetData.stats.trueDamageDealt = trueDamageDealt;
+          participantClinetData.stats.totalDamageDealtToChampions = totalDamageDealtToChampions;
+          participantClinetData.stats.trueDamageDealtToChampions = trueDamageDealtToChampions;
+          participantClinetData.stats.totalHeal = totalHeal;
+          participantClinetData.stats.visionScore = visionScore;
+          participantClinetData.stats.totalDamageTaken = totalDamageTaken;
+          participantClinetData.stats.trueDamageTaken = trueDamageTaken;
+          participantClinetData.stats.goldEarned = goldEarned;
+          participantClinetData.stats.turretKills = turretKills;
+          participantClinetData.stats.totalMinionsKilled = totalMinionsKilled;
+          participantClinetData.stats.neutralMinionsKilled = neutralMinionsKilled;
+          participantClinetData.stats.neutralMinionsKilledTeamJungle = neutralMinionsKilledTeamJungle;
+          participantClinetData.stats.neutralMinionsKilledEnemyJungle = neutralMinionsKilledEnemyJungle;
+          participantClinetData.stats.champLevel = champLevel;
+          participantClinetData.stats.firstBloodKill = firstBloodKill;
+          participantClinetData.stats.firstTowerKill = firstTowerKill;
+          participantClinetData.stats.perkPrimaryStyle = perkPrimaryStyle;
+          participantClinetData.stats.perkSubStyle = perkSubStyle;
+          participantClinetData.stats.perks = [perk0, perk1, perk2, perk3, perk4, perk5];
+          participantClinetData.stats.statPerks = [statPerk0, statPerk1, statPerk2];
+          participantClinetData.timeline = participant.timeline;
+
+          const team = gameClientData.teams[participant.teamId];
+          team.participants[participant.participantId] = participantClinetData;
+          team.totalKills += kills;
+          team.totalDeaths += deaths;
+          team.totalAssists += assists;
+
+          if (participant.participantId == gameClientData.requester.participantId) {
+            gameClientData.requester.teamId = participant.teamId;
+            gameClientData.requester.isWin = team.isWin;
+          }
+        });
+
+        result.push({ ...data, gameInfo: gameClientData });
+      });
+
+      res.json(result);
+    } else {
+      res.json([]);
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
   try {
     const start = Number(req.params.start);
@@ -195,9 +449,11 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
         100,
         timestamp
       );
-      const docs = await Match.collection.insertMany(insertMatchDataList);
-      matchList = docs.ops;
-      matchList = matchList.slice(0, count);
+      if (insertMatchDataList.length > 0) {
+        const docs = await Match.collection.insertMany(insertMatchDataList);
+        matchList = docs.ops;
+        matchList = matchList.slice(0, count);
+      }
     } else if (items.length < count) {
       const maxTimestampRows = await Match.aggregate([
         {
@@ -230,13 +486,13 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
       }
 
       const maxTimestamp = maxTimestampRows[0].timestamp;
-      if (!items[items.length - 1].first) {
-        const insertMatchDataList = await getMatchListExactly(
-          req.params.accountId,
-          start,
-          count - items.length,
-          maxTimestamp
-        );
+      const insertMatchDataList = await getMatchListExactly(
+        req.params.accountId,
+        start,
+        count - items.length,
+        maxTimestamp
+      );
+      if (insertMatchDataList.length > 0) {
         const docs = await Match.collection.insertMany(insertMatchDataList);
         matchList.push(...docs.ops);
       }
@@ -251,29 +507,37 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
     }
 
     if (matchList.length > 0) {
-      const gameModels: IGameModel[] = [];
+      const promises = [];
       for (let i = 0; i < matchList.length; i++) {
         const gameId = matchList[i].gameId;
-        let timeline = await GameTimeline.findOne({ gameId });
-        if (!timeline) {
-          const timelineData = await demacia.getMatchTimelineByGameId(gameId);
-          timeline = new GameTimeline({ ...timelineData, gameId });
-          timeline.save();
-        }
 
-        const games = await Game.find({ gameId: Number(gameId) }).limit(1);
-        if (games.length === 0) {
-          const data = await demacia.getMatchInfoByGameId(gameId);
-          const game = new Game(data);
-          game.save();
+        promises.push(
+          GameTimeline.findOne({ gameId }).then(async (timeline) => {
+            if (!timeline) {
+              const timelineData = await demacia.getMatchTimelineByGameId(gameId);
+              timeline = new GameTimeline({ ...timelineData, gameId });
+              timeline.save();
+            }
 
-          updateChampionAnalysisByGame(game, timeline);
+            return Game.find({ gameId: Number(gameId) })
+              .limit(1)
+              .then(async (games) => {
+                if (games.length === 0) {
+                  const data = await demacia.getMatchInfoByGameId(gameId);
+                  const game = new Game(data);
+                  game.save();
 
-          gameModels.push(game);
-        } else {
-          gameModels.push(games[0]);
-        }
+                  updateChampionAnalysisByGame(game, timeline!);
+
+                  return game;
+                } else {
+                  return games[0];
+                }
+              });
+          })
+        );
       }
+      const gameModels = await Promise.all(promises);
 
       const result: Object[] = [];
       matchList.forEach((match, idx) => {
@@ -470,21 +734,10 @@ function addRiftChampionClientData(
   return a;
 }
 
-router.get('/rift/champions/:seasonId/:accountId', async function(req, res, next) {
+router.get('/rift/champions/:accountId', async function(req, res, next) {
   try {
-    const seasonId = Number(req.params.seasonId);
     const accountId = req.params.accountId;
-
-    const lastSeason = await DDragonHelper.getLatestSeason();
-    if (seasonId > lastSeason) {
-      res.status(400).json({
-        status: {
-          message: 'Invalid season id',
-          status_code: 400,
-        },
-      });
-      return;
-    }
+    const seasonId = await DDragonHelper.getLatestSeason();
 
     const gameChampions = await GameChampion.find({
       summonerAccountId: accountId,

@@ -16,7 +16,6 @@ export async function getMatchListToBeInserted(
   let first = false;
   if (matchListData.length < 100) {
     first = true;
-    matchListData[matchListData.length - 1].first = true;
   }
 
   let insertMatchDataList = [];
@@ -26,7 +25,7 @@ export async function getMatchListToBeInserted(
       matchData = await Match.find({
         summonerAccountId: accountId,
         gameId: matchListData[i].gameId,
-      }).limit(1);
+      }).limit(1).lean();
 
       if (matchData.length === 0) {
         matchListData[i].summonerAccountId = accountId;
@@ -74,7 +73,6 @@ export async function getMatchListExactly(
       let i = 100;
       let totalCount = list.length;
       while (totalCount < count) {
-        console.log('next');
         let nextInsertMatchList = await getMatchListToBeInserted(
           accountId,
           start + i,
@@ -127,4 +125,32 @@ export async function getMatchListRecentlyAll(accountId: string) {
   } catch (err) {
     return Promise.reject(err);
   }
+}
+
+export async function getUnrankedMatchListToBeInserted(
+  accountId: string,
+  season: number,
+  queue: number
+) {
+  const data = await demacia.getMatchQueueListByAccountId(accountId, season, queue);
+  const matchListData = data.matches;
+  if (matchListData.length === 0) {
+    return Promise.resolve([]);
+  }
+
+  let insertMatchDataList = [];
+  for (var i = 0; i < matchListData.length; i++) {
+    let matchData = [];
+    matchData = await Match.find({
+      summonerAccountId: accountId,
+      gameId: matchListData[i].gameId,
+    }).limit(1);
+
+    if (matchData.length === 0) {
+      matchListData[i].summonerAccountId = accountId;
+      insertMatchDataList.push(matchListData[i]);
+    }
+  }
+
+  return insertMatchDataList;
 }

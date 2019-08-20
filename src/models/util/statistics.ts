@@ -82,6 +82,15 @@ export async function saveChampionRivalData({
     rivalStats.averageDamageTaken = (rivalStats.averageDamageTaken + stats.damageTaken) / 2;
     rivalStats.averageGoldEarned = (rivalStats.averageGoldEarned + stats.goldEarned) / 2;
     rivalStats.averageKillPercent = (rivalStats.averageKillPercent + stats.killPercent) / 2;
+    if (!rivalStats.csPerMinutes) {
+      rivalStats.csPerMinutes = {};
+    }
+    if (!rivalStats.goldPerMinutes) {
+      rivalStats.goldPerMinutes = {};
+    }
+    if (!rivalStats.xpPerMinutes) {
+      rivalStats.xpPerMinutes = {};
+    }
     if (stats.csPerMinutes) {
       for (const key of Object.keys(stats.csPerMinutes)) {
         if (rivalStats.csPerMinutes[key]) {

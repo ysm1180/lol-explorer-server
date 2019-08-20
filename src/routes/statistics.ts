@@ -264,7 +264,7 @@ router.get('/champion/easys/:championId/:positionId', async function(req, res, n
       },
       {
         $match: {
-          count: { $gt: 10 },
+          count: { $gt: 50 },
           win_rate: { $gte: 50 },
         },
       },
@@ -272,9 +272,6 @@ router.get('/champion/easys/:championId/:positionId', async function(req, res, n
         $sort: {
           win_rate: -1,
         },
-      },
-      {
-        $limit: 6,
       },
     ]);
 
@@ -344,7 +341,7 @@ router.get('/champion/counters/:championId/:positionId', async function(req, res
       },
       {
         $match: {
-          count: { $gt: 10 },
+          count: { $gt: 50 },
           win_rate: { $lt: 50 },
         },
       },
@@ -352,9 +349,6 @@ router.get('/champion/counters/:championId/:positionId', async function(req, res
         $sort: {
           win_rate: 1,
         },
-      },
-      {
-        $limit: 6,
       },
     ]);
 

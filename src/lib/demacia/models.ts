@@ -12,7 +12,7 @@ export interface IMatchApiData {
   gameId: number;
   champion: number;
   timestamp: number;
-  first?: boolean;
+  queue: number;
 }
 
 export interface IGameTeamData {

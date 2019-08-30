@@ -54,7 +54,10 @@ router.get('/champion/all', async function(req, res, next) {
 
         let tooltip: string = spell.tooltip;
         for (let e = 0; e <= 10; e++) {
-          tooltip = tooltip.replace(new RegExp(`{{\\s*e${e}\\s*}}`, 'g'), spell.effectBurn[e] || '');
+          tooltip = tooltip.replace(
+            new RegExp(`{{\\s*e${e}\\s*}}`, 'g'),
+            spell.effectBurn[e] || ''
+          );
         }
         for (const key in vars) {
           tooltip = tooltip.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), vars[key] || '');
@@ -66,7 +69,9 @@ router.get('/champion/all', async function(req, res, next) {
         spell.tooltip = tooltip;
 
         if (spell.resource) {
-          let resource = spell.resource.replace(/{{ abilityresourcename }}/, clientData.partype).replace(/{{ cost }}/, spell.costBurn);
+          let resource = spell.resource
+            .replace(/{{ abilityresourcename }}/, clientData.partype)
+            .replace(/{{ cost }}/, spell.costBurn);
           spell.resource = resource;
         }
 
@@ -184,6 +189,7 @@ router.get('/perk/all', function(req, res, next) {
           clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id].iconUrl =
             baseIconUrl +
             clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id].icon;
+          clientData[rawData[i].id].slots[j].runes[rawData[i].slots[j].runes[k].id].sort = k;
         }
       }
     }

@@ -1,7 +1,7 @@
+import { DDragonHelper } from '../../lib/demacia/data-dragon/ddragon-helper';
 import Champion from '../static/champion';
 import Item from '../static/item';
 import Spell from '../static/spell';
-import { DDragonHelper } from '../../lib/demacia/data-dragon/ddragon-helper';
 
 export async function registerStaticChamionList(champions: { [id: string]: string }) {
   for (const championId in champions) {
@@ -46,64 +46,73 @@ export async function registerStaticSpellList(spells: any) {
   console.log(`[Mongo] Finish spells.`);
 }
 
-export async function getConsumedStaticItemIdList() {
+export async function getConsumedItemIdList() {
   const items = await Item.find();
   const version = await DDragonHelper.getLatestVersion();
   const result = [];
   for (let i = 0; i < items.length; i++) {
     const rawData = await DDragonHelper.getItemData(version, items[i].key);
-    if (rawData.consumed) {
+    if (items[i].key === 2033 || items[i].key === 2031 || rawData.consumed) {
       result.push(items[i].key);
     }
   }
   return result;
 }
 
-export async function getCombinedStaticItemIdList() {
-  const items = await Item.find();
+export async function getIntermediateItems() {
   const version = await DDragonHelper.getLatestVersion();
-  const result = [];
-  for (let i = 0; i < items.length; i++) {
-    const rawData = await DDragonHelper.getItemData(version, items[i].key);
-    if (rawData.from && rawData.from.length > 0) {
-      result.push(items[i].key);
+  const combinedItemsByFinalItem = await getCombinedItemsByFinalItem();
+  const result: { [id: string]: { itemId: number; into: number[] } } = {};
+  for (const key in combinedItemsByFinalItem) {
+    for (const id of combinedItemsByFinalItem[key]) {
+      if (!combinedItemsByFinalItem[id]) {
+        if (!result[id]) {
+          const rawData = await DDragonHelper.getItemData(version, Number(id));
+          result[id] = {
+            itemId: Number(id),
+            into: rawData.into ? rawData.into.map((id) => Number(id)) : [],
+          };
+        }
+      }
     }
   }
   return result;
 }
 
-export async function getFinalStaticItemIdList() {
+export async function getCombinedItemsByFinalItem() {
   const items = await Item.find();
   const version = await DDragonHelper.getLatestVersion();
-  const result = [];
+  const result: { [id: string]: string[] } = {};
   for (let i = 0; i < items.length; i++) {
     const rawData = await DDragonHelper.getItemData(version, items[i].key);
     if (rawData.from && rawData.from.length > 0) {
       if (rawData.into && rawData.into.length === 1) {
         const intoRawData = await DDragonHelper.getItemData(version, Number(rawData.into[0]));
         if (intoRawData.requiredAlly) {
-          result.push(items[i].key);
+          result[items[i].key] = rawData.from;
         }
       } else if (!rawData.into) {
-        result.push(items[i].key);
+        if (!rawData.requiredAlly) {
+          result[items[i].key] = rawData.from;
+        }
       }
     }
   }
   return result;
 }
 
-export async function getShoesStaticItemIdList() {
+export async function getShoesItemIdList() {
   const items = await Item.find();
   const version = await DDragonHelper.getLatestVersion();
   const result = [];
   for (let i = 0; i < items.length; i++) {
     const rawData = await DDragonHelper.getItemData(version, items[i].key);
-    if (rawData.from && rawData.from.length > 0) {
-      if (rawData.from.includes('1001')) {
-        result.push(items[i].key);
-      }
+    if (
+      items[i].key === 1001 ||
+      (rawData.from && rawData.from.length > 0 && rawData.from.includes('1001'))
+    ) {
+      result.push(items[i].key);
     }
   }
   return result;
 }
-

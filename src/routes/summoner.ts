@@ -524,6 +524,10 @@ router.get('/matches/:accountId/:start/:count', async function(req, res, next) {
               .then(async (games) => {
                 if (games.length === 0) {
                   const data = await demacia.getMatchInfoByGameId(gameId);
+                  data.gameVersion = data.gameVersion
+                    .split('.')
+                    .slice(0, 2)
+                    .join('.');
                   const game = new Game(data);
                   game.save();
 

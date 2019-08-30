@@ -2,9 +2,9 @@ import { LANE, POSITION, RIFT_LANE, RIFT_POSITION, RIFT_ROLE } from '../../lib/d
 import { ItemUtil } from '../../lib/demacia/util/item-util';
 import { IGameModel } from '../game';
 import GameChampion from '../game-champion';
-import StatisticsChampionPositions from '../statistics/champion_position';
 import { IGameTimelineModel } from '../game-timeline';
-import { getMostFrequentLane } from './timeline';
+import StatisticsChampionPositions from '../statistics/champion_position';
+import { getItemEvents } from './timeline';
 
 export interface IParticipantPositionData {
   participantId: number;
@@ -54,8 +54,8 @@ export function getPositionDataByTeam(game: IGameModel, timeline: IGameTimelineM
 
       const { lane, role } = participantData.timeline;
       const { item0, item1, item2, item3, item4, item5, item6 } = participantData.stats;
-      let position = getFixedPosition(lane, role);    
-      
+      let position = getFixedPosition(lane, role);
+
       if (position === POSITION.UNKNOWN) {
         const hasSmiteSpell = participantData.spell1Id === 11 || participantData.spell2Id === 11;
         if (hasSmiteSpell) {
@@ -64,17 +64,32 @@ export function getPositionDataByTeam(game: IGameModel, timeline: IGameTimelineM
       }
 
       if (position === POSITION.UNKNOWN) {
-        const hasSupportItem = [item0, item1, item2, item3, item4, item5, item6].filter(
-         (item) => ItemUtil.isSupportItem(item)).length !== 0;
+        let hasSupportItem =
+          [item0, item1, item2, item3, item4, item5, item6].filter((item) =>
+            ItemUtil.isSupportItem(item)
+          ).length !== 0;
         if (hasSupportItem) {
           position = POSITION.SUPPORT;
-        }
-      }
+        } else {
+          const itemEvents = getItemEvents(timeline, participantId);
+          const purchasedItemIds = [];
 
-      if (position === POSITION.UNKNOWN) {
-        const mostLane = getMostFrequentLane(timeline, participantId);
-        if (mostLane === 'BOTTOM') {
+          for (const item of itemEvents) {
+            if (item.type === 'ITEM_PURCHASED') {
+              purchasedItemIds.push(item.itemId);
+            } else if (item.type === 'ITEM_UNDO') {
+              let index = purchasedItemIds.indexOf(item.itemId);
+              if (index !== -1) {
+                purchasedItemIds.splice(index, 1);
+              }
+            }
+          }
 
+          hasSupportItem =
+            purchasedItemIds.filter((item) => ItemUtil.isSupportItem(item)).length !== 0;
+          if (hasSupportItem) {
+            position = POSITION.SUPPORT;
+          }
         }
       }
 
@@ -83,9 +98,9 @@ export function getPositionDataByTeam(game: IGameModel, timeline: IGameTimelineM
         if (duplicated) {
           duplicated.position = POSITION.UNKNOWN;
           position = POSITION.UNKNOWN;
-        } 
+        }
       }
-      
+
       result[teamId].push({
         lane,
         role,
@@ -150,7 +165,10 @@ async function getRoles(
       const el = input.splice(i, 1)[0];
       used.push(el);
       if (input.length == 0) {
-        return [used.slice()];
+        const result = used.slice();
+        used.pop();
+        input.splice(i, 0, el);
+        return [result];
       }
       permArr.push(...permuteAll(input, used));
       input.splice(i, 0, el);
@@ -303,6 +321,20 @@ export async function getPredictPositions(game: IGameModel, timeline: IGameTimel
         positions[i].position = bestPosition[positions[i].participantId];
       }
     }
+
+    const positionData = positions.map((data) => data.position);
+    const riftPositions = [
+      POSITION.TOP,
+      POSITION.JUNGLE,
+      POSITION.MID,
+      POSITION.ADC,
+      POSITION.SUPPORT,
+    ];
+    const unusedPositions = riftPositions.filter((position) => !positionData.includes(position));
+    const unknownPositions = positions.filter((data) => data.position === POSITION.UNKNOWN);
+    if (unknownPositions.length === 1) {
+      unknownPositions[0].position = unusedPositions[0];
+    }
   }
 
   return positionsByTeam;
@@ -333,10 +365,6 @@ export async function updateChampionAnalysisByGame(game: IGameModel, timeline: I
         return p.participantId === summoners[i].participantId;
       });
       const accountId = summoners[i].player.accountId;
-      const gameVersion = () => {
-        const temp = game.gameVersion.split('.');
-        return `${temp[0]}.${temp[1]}`;
-      };
       if (participant) {
         const gameChampions = await GameChampion.find({
           summonerAccountId: accountId,
@@ -345,7 +373,7 @@ export async function updateChampionAnalysisByGame(game: IGameModel, timeline: I
           queueId: game.queueId,
           mapId: game.mapId,
           seasonId: game.seasonId,
-          gameVersion: gameVersion(),
+          gameVersion: game.gameVersion,
           predictPosition: positions[participant.participantId],
         }).limit(1);
 
@@ -357,7 +385,7 @@ export async function updateChampionAnalysisByGame(game: IGameModel, timeline: I
             queueId: game.queueId,
             mapId: game.mapId,
             seasonId: game.seasonId,
-            gameVersion: gameVersion(),
+            gameVersion: game.gameVersion,
             wins: participant.stats.win ? 1 : 0,
             losses: participant.stats.win ? 0 : 1,
             averageKills: participant.stats.kills,

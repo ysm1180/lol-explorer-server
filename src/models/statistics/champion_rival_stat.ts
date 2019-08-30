@@ -10,8 +10,7 @@ export interface IStatisticsChampionRivalStatModel extends Document {
   gameVersion: string;
   csPerMinutes: { [duration: string]: number };
   goldPerMinutes: { [duration: string]: number };
-  xpPerMinutes: { [duration: string]: number };
-  averageSoloKills: number;
+  totalSoloKills: number;
   averageKills: number;
   averageDeaths: number;
   averageAssists: number;
@@ -31,7 +30,7 @@ var statisticsChampionRivalStatSchema = new Schema({
   csPerMinutes: Schema.Types.Mixed,
   goldPerMinutes:  Schema.Types.Mixed,
   xpPerMinutes: Schema.Types.Mixed,
-  averageSoloKills: Number,
+  totalSoloKills: Number,
   averageKills: Number,
   averageDeaths: Number,
   averageAssists: Number,

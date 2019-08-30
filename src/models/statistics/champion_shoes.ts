@@ -4,7 +4,6 @@ import { POSITION } from '../../lib/demacia/constants';
 export interface IStatisticsChampionShoesModel extends Document {
   championKey: number;
   position: POSITION;
-  tier: string;
   count: number;
   win: number;
   gameVersion: string;
@@ -15,7 +14,6 @@ export interface IStatisticsChampionShoesModel extends Document {
 var statisticsChampionShoesSchema = new Schema({
   championKey: Number,
   position: Number,
-  tier: String,
   count: Number,
   win: Number,
   gameVersion: String,

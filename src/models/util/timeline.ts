@@ -165,7 +165,7 @@ export function getSkillLevelupSlots(timeline: IGameTimelineApiData, participant
 }
 
 export function getStartItemIdList(timeline: IGameTimelineApiData, participantId: number) {
-  const result = [];
+  let result = [];
   for (let i = 0; i < timeline.frames.length; i++) {
     const events = timeline.frames[i].events;
     for (let j = 0; j < events.length; j++) {
@@ -175,6 +175,8 @@ export function getStartItemIdList(timeline: IGameTimelineApiData, participantId
             events[j].killerId === participantId ||
             events[j].assistingParticipantIds!.includes(participantId)
           ) {
+            result.sort((a, b) => a - b);
+
             return result;
           }
         }
@@ -191,6 +193,8 @@ export function getStartItemIdList(timeline: IGameTimelineApiData, participantId
           }
         }
       } else {
+        result.sort((a, b) => a - b);
+
         return result;
       }
     }

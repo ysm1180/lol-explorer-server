@@ -1,7 +1,12 @@
 import StatisticsChampionBan from '../statistics/champion_ban';
 import StatisticsChampionPosition from '../statistics/champion_position';
-import StatisticsChampionPurchasedItem from '../statistics/champion_purchased_item';
-import StatisticsChampionRivalItem from '../statistics/champion_rival_item_build';
+import StatisticsChampionItemBuild from '../statistics/champion_item_build';
+import StatisticsChampionMainItem from '../statistics/champion_main_item';
+import StatisticsChampionFinalItem from '../statistics/champion_final_item';
+import StatisticsChampionFinalItemBuild from '../statistics/champion_final_item_build';
+import StatisticsChampionRivalItemBuild from '../statistics/champion_rival_item_build';
+import StatisticsChampionRivalMainItemBuild from '../statistics/champion_rival_main_item_build';
+import StatisticsChampionRivalFinalItem from '../statistics/champion_rival_final_item';
 import StatisticsChampionRivalRune from '../statistics/champion_rival_rune_build';
 import StatisticsChampionRivalShoes from '../statistics/champion_rival_shoes';
 import StatisticsChampionRivalSpell from '../statistics/champion_rival_spell_build';
@@ -14,6 +19,7 @@ import StatisticsChampionSkillSet from '../statistics/champion_skill_set';
 import StatisticsChampionSpell from '../statistics/champion_spell';
 import StatisticsChampionStartItem from '../statistics/champion_start_item';
 import StatisticsChampionTimeWin from '../statistics/champion_time_win';
+
 export async function saveChampionRivalData({
   championKey,
   rivalChampionKey,
@@ -22,6 +28,8 @@ export async function saveChampionRivalData({
   isWin,
   runeData,
   items,
+  finalItems,
+  itemBuild,
   spells,
   startItems,
   shoes,
@@ -40,7 +48,9 @@ export async function saveChampionRivalData({
     subRunes: number[];
     statRunes: number[];
   };
+  finalItems: number[];
   items: number[];
+  itemBuild: number[];
   spells: number[];
   startItems: number[];
   shoes: {
@@ -50,7 +60,6 @@ export async function saveChampionRivalData({
   stats: {
     csPerMinutes?: { [duration: string]: number };
     goldPerMinutes?: { [duration: string]: number };
-    xpPerMinutes?: { [duration: string]: number };
     soloKills: number;
     kills: number;
     deaths: number;
@@ -73,7 +82,7 @@ export async function saveChampionRivalData({
     if (isWin) {
       rivalStats.win++;
     }
-    rivalStats.averageSoloKills = (rivalStats.averageSoloKills + stats.soloKills) / 2;
+    rivalStats.totalSoloKills += stats.soloKills;
     rivalStats.averageKills = (rivalStats.averageKills + stats.kills) / 2;
     rivalStats.averageDeaths = (rivalStats.averageDeaths + stats.deaths) / 2;
     rivalStats.averageAssists = (rivalStats.averageAssists + stats.assists) / 2;
@@ -87,9 +96,6 @@ export async function saveChampionRivalData({
     }
     if (!rivalStats.goldPerMinutes) {
       rivalStats.goldPerMinutes = {};
-    }
-    if (!rivalStats.xpPerMinutes) {
-      rivalStats.xpPerMinutes = {};
     }
     if (stats.csPerMinutes) {
       for (const key of Object.keys(stats.csPerMinutes)) {
@@ -111,16 +117,6 @@ export async function saveChampionRivalData({
         }
       }
     }
-    if (stats.xpPerMinutes) {
-      for (const key of Object.keys(stats.xpPerMinutes)) {
-        if (rivalStats.xpPerMinutes[key]) {
-          rivalStats.xpPerMinutes[key] =
-            (rivalStats.xpPerMinutes[key] + stats.xpPerMinutes[key]) / 2;
-        } else {
-          rivalStats.xpPerMinutes[key] = stats.xpPerMinutes[key];
-        }
-      }
-    }
 
     await rivalStats.save();
   } else {
@@ -131,7 +127,7 @@ export async function saveChampionRivalData({
       gameVersion,
       count: 1,
       win: isWin ? 1 : 0,
-      averageSoloKills: stats.soloKills,
+      totalSoloKills: stats.soloKills,
       averageKills: stats.kills,
       averageDeaths: stats.deaths,
       averageAssists: stats.assists,
@@ -139,7 +135,6 @@ export async function saveChampionRivalData({
       averageDamageTaken: stats.damageTaken,
       averageGoldEarned: stats.goldEarned,
       averageKillPercent: stats.killPercent,
-      xpPerMinutes: {},
       csPerMinutes: {},
       goldPerMinutes: {},
     });
@@ -161,16 +156,6 @@ export async function saveChampionRivalData({
             (rivalStats.goldPerMinutes[key] + stats.goldPerMinutes[key]) / 2;
         } else {
           rivalStats.goldPerMinutes[key] = stats.goldPerMinutes[key];
-        }
-      }
-    }
-    if (stats.xpPerMinutes) {
-      for (const key of Object.keys(stats.xpPerMinutes)) {
-        if (rivalStats.xpPerMinutes[key]) {
-          rivalStats.xpPerMinutes[key] =
-            (rivalStats.xpPerMinutes[key] + stats.xpPerMinutes[key]) / 2;
-        } else {
-          rivalStats.xpPerMinutes[key] = stats.xpPerMinutes[key];
         }
       }
     }
@@ -264,8 +249,8 @@ export async function saveChampionRivalData({
     }
   }
 
-  if (items.length > 0) {
-    const item = await StatisticsChampionRivalItem.findOne({
+  if (items.length >= 3) {
+    const item = await StatisticsChampionRivalMainItemBuild.findOne({
       championKey,
       rivalChampionKey,
       position,
@@ -279,13 +264,67 @@ export async function saveChampionRivalData({
       }
       await item.save();
     } else {
-      await new StatisticsChampionRivalItem({
+      await new StatisticsChampionRivalMainItemBuild({
         championKey,
         rivalChampionKey,
         position,
         gameVersion,
         items,
         itemCount: items.length,
+        count: 1,
+        win: isWin ? 1 : 0,
+      }).save();
+    }
+  }
+
+  if (itemBuild.length > 0) {
+    const item = await StatisticsChampionRivalItemBuild.findOne({
+      championKey,
+      rivalChampionKey,
+      position,
+      gameVersion,
+      items: itemBuild,
+    });
+    if (item) {
+      item.count++;
+      if (isWin) {
+        item.win++;
+      }
+      await item.save();
+    } else {
+      await new StatisticsChampionRivalItemBuild({
+        championKey,
+        rivalChampionKey,
+        position,
+        gameVersion,
+        items: itemBuild,
+        count: 1,
+        win: isWin ? 1 : 0,
+      }).save();
+    }
+  }
+
+  for (const finalItem of finalItems) {
+    const item = await StatisticsChampionRivalFinalItem.findOne({
+      championKey,
+      rivalChampionKey,
+      position,
+      gameVersion,
+      item: finalItem,
+    });
+    if (item) {
+      item.count++;
+      if (isWin) {
+        item.win++;
+      }
+      await item.save();
+    } else {
+      await new StatisticsChampionRivalFinalItem({
+        championKey,
+        rivalChampionKey,
+        position,
+        gameVersion,
+        item: finalItem,
         count: 1,
         win: isWin ? 1 : 0,
       }).save();
@@ -350,7 +389,6 @@ export async function saveChampionRivalData({
 export async function saveChampionShoes({
   championKey,
   position,
-  tier,
   gameVersion,
   shoes: shoesId,
   timestamp,
@@ -358,7 +396,6 @@ export async function saveChampionShoes({
 }: {
   championKey: number;
   position: number;
-  tier: string;
   gameVersion: string;
   shoes: number;
   timestamp: number;
@@ -367,7 +404,6 @@ export async function saveChampionShoes({
   const shoes = await StatisticsChampionShoes.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
     shoes: shoesId,
   });
@@ -382,7 +418,6 @@ export async function saveChampionShoes({
     await new StatisticsChampionShoes({
       championKey,
       position,
-      tier,
       gameVersion,
       count: 1,
       win: isWin ? 1 : 0,
@@ -467,7 +502,6 @@ export async function saveChampionBans({
 
 export async function saveChampionRune({
   championKey,
-  tier,
   position,
   gameVersion,
   isWin,
@@ -478,7 +512,6 @@ export async function saveChampionRune({
   statRunes,
 }: {
   championKey: number;
-  tier: string;
   position: number;
   gameVersion: string;
   isWin: boolean;
@@ -491,7 +524,6 @@ export async function saveChampionRune({
   const rune = await StatisticsChampionRune.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
     mainRuneStyle,
     mainRunes,
@@ -509,7 +541,6 @@ export async function saveChampionRune({
     await new StatisticsChampionRune({
       championKey,
       position,
-      tier,
       gameVersion,
       mainRuneStyle,
       mainRunes,
@@ -524,14 +555,12 @@ export async function saveChampionRune({
 
 export async function saveChampionSkillSet({
   championKey,
-  tier,
   position,
   gameVersion,
   isWin,
   skills,
 }: {
   championKey: number;
-  tier: string;
   position: number;
   gameVersion: string;
   isWin: boolean;
@@ -540,7 +569,6 @@ export async function saveChampionSkillSet({
   const skillset = await StatisticsChampionSkillSet.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
     skills,
   });
@@ -554,7 +582,6 @@ export async function saveChampionSkillSet({
     await new StatisticsChampionSkillSet({
       championKey,
       position,
-      tier,
       gameVersion,
       skills,
       count: 1,
@@ -563,25 +590,22 @@ export async function saveChampionSkillSet({
   }
 }
 
-export async function saveChampionPurchasedItems({
+export async function saveChampionItemBuild({
   championKey,
-  tier,
   position,
   gameVersion,
   isWin,
   items,
 }: {
   championKey: number;
-  tier: string;
   position: number;
   gameVersion: string;
   isWin: boolean;
   items: number[];
 }) {
-  const item = await StatisticsChampionPurchasedItem.findOne({
+  const item = await StatisticsChampionItemBuild.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
     items,
   });
@@ -592,10 +616,120 @@ export async function saveChampionPurchasedItems({
     }
     await item.save();
   } else {
-    await new StatisticsChampionPurchasedItem({
+    await new StatisticsChampionItemBuild({
       championKey,
       position,
-      tier,
+      gameVersion,
+      items,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+export async function saveChampionMainItems({
+  championKey,
+  position,
+  gameVersion,
+  isWin,
+  items,
+}: {
+  championKey: number;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  items: number[];
+}) {
+  const item = await StatisticsChampionMainItem.findOne({
+    championKey,
+    position,
+    gameVersion,
+    items,
+  });
+  if (item) {
+    item.count++;
+    if (isWin) {
+      item.win++;
+    }
+    await item.save();
+  } else {
+    await new StatisticsChampionMainItem({
+      championKey,
+      position,
+      gameVersion,
+      items,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+export async function saveChampionFinalItem({
+  championKey,
+  position,
+  gameVersion,
+  isWin,
+  item,
+}: {
+  championKey: number;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  item: number;
+}) {
+  const finalItem = await StatisticsChampionFinalItem.findOne({
+    championKey,
+    position,
+    gameVersion,
+    item,
+  });
+  if (finalItem) {
+    finalItem.count++;
+    if (isWin) {
+      finalItem.win++;
+    }
+    await finalItem.save();
+  } else {
+    await new StatisticsChampionFinalItem({
+      championKey,
+      position,
+      gameVersion,
+      item,
+      count: 1,
+      win: isWin ? 1 : 0,
+    }).save();
+  }
+}
+
+export async function saveChampionFinalItemBuild({
+  championKey,
+  position,
+  gameVersion,
+  isWin,
+  items,
+}: {
+  championKey: number;
+  position: number;
+  gameVersion: string;
+  isWin: boolean;
+  items: number[];
+}) {
+  const item = await StatisticsChampionFinalItemBuild.findOne({
+    championKey,
+    position,
+    gameVersion,
+    items,
+  });
+  if (item) {
+    item.count++;
+    if (isWin) {
+      item.win++;
+    }
+    await item.save();
+  } else {
+    await new StatisticsChampionFinalItemBuild({
+      championKey,
+      position,
       gameVersion,
       items,
       itemCount: items.length,
@@ -607,14 +741,12 @@ export async function saveChampionPurchasedItems({
 
 export async function saveChampionSpell({
   championKey,
-  tier,
   position,
   gameVersion,
   isWin,
   spells,
 }: {
   championKey: number;
-  tier: string;
   position: number;
   gameVersion: string;
   isWin: boolean;
@@ -623,7 +755,6 @@ export async function saveChampionSpell({
   const spell = await StatisticsChampionSpell.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
     spells,
   });
@@ -637,7 +768,6 @@ export async function saveChampionSpell({
     await new StatisticsChampionSpell({
       championKey,
       position,
-      tier,
       gameVersion,
       spells,
       count: 1,
@@ -648,14 +778,12 @@ export async function saveChampionSpell({
 
 export async function saveChampionStartItem({
   championKey,
-  tier,
   position,
   gameVersion,
   isWin,
   items,
 }: {
   championKey: number;
-  tier: string;
   position: number;
   gameVersion: string;
   isWin: boolean;
@@ -664,7 +792,6 @@ export async function saveChampionStartItem({
   const startItem = await StatisticsChampionStartItem.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
     items,
   });
@@ -678,7 +805,6 @@ export async function saveChampionStartItem({
     await new StatisticsChampionStartItem({
       championKey,
       position,
-      tier,
       gameVersion,
       items,
       count: 1,
@@ -688,37 +814,107 @@ export async function saveChampionStartItem({
 }
 export async function saveChampionPosition({
   championKey,
-  tier,
   position,
   gameVersion,
   isWin,
+  stats,
 }: {
   championKey: number;
-  tier: string;
   position: number;
   gameVersion: string;
   isWin: boolean;
+  stats: {
+    kills: number;
+    deaths: number;
+    assists: number;
+    damageTaken: number;
+    goldEarned: number;
+    killPercent: number;
+    timeCCingOthers: number;
+    timeCrowdControlDealt: number;
+    neutralMinionsKilled: number;
+    neutralMinionsKilledTeamJungle: number;
+    neutralMinionsKilledEnemyJungle: number;
+    damageSelfMitigated: number;
+    trueDamageDealtToChampions: number;
+    magicDamageDealtToChampions: number;
+    physicalDamageDealtToChampions: number;
+    heal: number;
+    unitsHealed: number;
+  };
 }) {
-  const count = await StatisticsChampionPosition.findOne({
+  const data = await StatisticsChampionPosition.findOne({
     championKey,
     position,
-    tier,
     gameVersion,
   });
-  if (count) {
-    count.count++;
+  if (data) {
+    data.count++;
     if (isWin) {
-      count.win++;
+      data.win++;
     }
-    await count.save();
+    data.averageKills = (data.averageKills + stats.kills) / 2;
+    data.averageDeaths = (data.averageDeaths + stats.deaths) / 2;
+    data.averageAssists = (data.averageAssists + stats.assists) / 2;
+    data.averageGoldEarned = (data.averageGoldEarned + stats.goldEarned) / 2;
+    data.averageDamageTaken = (data.averageDamageTaken + stats.damageTaken) / 2;
+    data.averageKillPercent = (data.averageKillPercent + stats.killPercent) / 2;
+    data.averageTimeCCingOthers = (data.averageTimeCCingOthers + stats.timeCCingOthers) / 2;
+    data.averageTimeCrowdControlDealt =
+      (data.averageTimeCrowdControlDealt + stats.timeCrowdControlDealt) / 2;
+    data.averageNeutralMinionsKilled =
+      (data.averageNeutralMinionsKilled + stats.neutralMinionsKilled) / 2;
+    if (!data.averageNeutralMinionsKilledTeamJungle) {
+      data.averageNeutralMinionsKilledTeamJungle = 0;
+    }
+    if (!stats.neutralMinionsKilledTeamJungle) {
+      stats.neutralMinionsKilledTeamJungle = 0;
+    }
+    data.averageNeutralMinionsKilledTeamJungle =
+      (data.averageNeutralMinionsKilledTeamJungle + stats.neutralMinionsKilledTeamJungle) / 2;
+    if (!data.averageNeutralMinionsKilledEnemyJungle) {
+      data.averageNeutralMinionsKilledEnemyJungle = 0;
+    }
+    if (!stats.neutralMinionsKilledEnemyJungle) {
+      stats.neutralMinionsKilledEnemyJungle = 0;
+    }
+    data.averageNeutralMinionsKilledEnemyJungle =
+      (data.averageNeutralMinionsKilledEnemyJungle + stats.neutralMinionsKilledEnemyJungle) / 2;
+    data.averageDamageSelfMitigated =
+      (data.averageDamageSelfMitigated + stats.damageSelfMitigated) / 2;
+    data.averageTrueDamageDealtToChampions =
+      (data.averageTrueDamageDealtToChampions + stats.trueDamageDealtToChampions) / 2;
+    data.averageMagicDamageDealtToChampions =
+      (data.averageMagicDamageDealtToChampions + stats.magicDamageDealtToChampions) / 2;
+    data.averagePhysicalDamageDealtToChampions =
+      (data.averagePhysicalDamageDealtToChampions + stats.physicalDamageDealtToChampions) / 2;
+    data.averageHeal = (data.averageHeal + stats.heal) / 2;
+    data.averageUnitsHealed = (data.averageUnitsHealed + stats.unitsHealed) / 2;
+    await data.save();
   } else {
     await new StatisticsChampionPosition({
       championKey,
       position,
-      tier,
       gameVersion,
       count: 1,
       win: isWin ? 1 : 0,
+      averageKills: stats.kills,
+      averageDeaths: stats.deaths,
+      averageAssists: stats.assists,
+      averageGoldEarned: stats.goldEarned,
+      averageDamageTaken: stats.damageTaken,
+      averageKillPercent: stats.killPercent,
+      averageTimeCCingOthers: stats.timeCCingOthers,
+      averageTimeCrowdControlDealt: stats.timeCrowdControlDealt,
+      averageNeutralMinionsKilled: stats.neutralMinionsKilled,
+      averageNeutralMinionsKilledTeamJungle: stats.neutralMinionsKilledTeamJungle,
+      averageNeutralMinionsKilledEnemyJungle: stats.neutralMinionsKilledEnemyJungle,
+      averageDamageSelfMitigated: stats.damageSelfMitigated,
+      averageTrueDamageDealtToChampions: stats.trueDamageDealtToChampions,
+      averageMagicDamageDealtToChampions: stats.magicDamageDealtToChampions,
+      averagePhysicalDamageDealtToChampions: stats.physicalDamageDealtToChampions,
+      averageHeal: stats.heal,
+      averageUnitsHealed: stats.unitsHealed,
     }).save();
   }
 }

@@ -129,6 +129,21 @@ export class DDragonHelper {
     return version;
   }
 
+  static async getVersions(): Promise<string[]> {
+    let versions = await redis.get('LOL_VERSIONS');
+    if (!versions) {
+      try {
+        const res = await axios.get(DDragonHelper.URL_VERSION());
+        versions = JSON.stringify(res.data);
+        redis.set('LOL_VERSIONS', versions, 60 * 60 * 4);
+      } catch (err) {
+        return Promise.reject(err);
+      }
+    }
+
+    return JSON.parse(versions);
+  }
+
   static async getLatestSeason(): Promise<number> {
     let season = await redis.get('LOL_LAST_SEASON_ID');
     if (!season) {
@@ -189,7 +204,7 @@ export class DDragonHelper {
       });
   }
 
-  static getItemList(version: string) {
+  static getItemList(version: string): Promise<{ [key: string]: IItemDataDragon }> {
     return getStaticData(version, 'item_all')
       .then((data) => {
         return data.data;
@@ -405,15 +420,11 @@ function downloadStaticDataFiles(version: string, dest: string) {
           .get(info.downloadUrl)
           .then((response) => {
             if (info.trasnform) {
-              console.log('transform');
               return info.trasnform(response);
             }
             return response;
           })
           .then((response) => {
-            if (info.downloadFileName === 'perk_all.json') {
-              console.log(JSON.stringify(response.data));
-            }
             fs.writeFileSync(downloadFilePath, JSON.stringify(response.data));
             console.log(`[${info.downloadFileName}] Written.`);
 

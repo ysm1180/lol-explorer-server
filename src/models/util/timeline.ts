@@ -169,7 +169,7 @@ export function getStartItemIdList(timeline: IGameTimelineApiData, participantId
   for (let i = 0; i < timeline.frames.length; i++) {
     const events = timeline.frames[i].events;
     for (let j = 0; j < events.length; j++) {
-      if (events[j].timestamp <= 1 * 60 * 1000 + 40 * 1000) {
+      if (events[j].timestamp <= 1 * 60 * 1000 + 20 * 1000) {
         if (events[j].type === 'CHAMPION_KILL') {
           if (
             events[j].killerId === participantId ||

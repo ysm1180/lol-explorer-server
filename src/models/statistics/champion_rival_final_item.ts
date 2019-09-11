@@ -8,7 +8,7 @@ export interface IStatisticsChampionRivalFinalItemModel extends Document {
   count: number;
   win: number;
   gameVersion: string;
-  items: number[];
+  item: number;
 }
 
 var statisticsChampionRivalFinalItemSchema = new Schema({
@@ -18,7 +18,7 @@ var statisticsChampionRivalFinalItemSchema = new Schema({
   count: Number,
   win: Number,
   gameVersion: String,
-  items: [Number],
+  item: Number,
 });
 
 export default model<IStatisticsChampionRivalFinalItemModel>(

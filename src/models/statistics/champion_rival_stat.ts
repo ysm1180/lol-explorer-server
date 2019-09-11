@@ -29,7 +29,6 @@ var statisticsChampionRivalStatSchema = new Schema({
   gameVersion: String,
   csPerMinutes: Schema.Types.Mixed,
   goldPerMinutes:  Schema.Types.Mixed,
-  xpPerMinutes: Schema.Types.Mixed,
   totalSoloKills: Number,
   averageKills: Number,
   averageDeaths: Number,

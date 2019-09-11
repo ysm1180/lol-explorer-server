@@ -1,37 +1,52 @@
 import * as express from 'express';
+import { Model } from 'mongoose';
 import mongo from '../db/mongo';
 import { POSITION } from '../lib/demacia/constants';
 import GameTimeline from '../models/game-timeline';
+import StatisticsChampionBan from '../models/statistics/champion_ban';
+import StatisticsChampionFinalItem from '../models/statistics/champion_final_item';
+import StatisticsChampionFinalItemBuild from '../models/statistics/champion_final_item_build';
+import StatisticsChampionItemBuild from '../models/statistics/champion_item_build';
+import StatisticsChampionMainItem from '../models/statistics/champion_main_item';
+import StatisticsChampionPosition from '../models/statistics/champion_position';
+import StatisticsChampionRivalFinalItem from '../models/statistics/champion_rival_final_item';
+import StatisticsChampionRivalItemBuild from '../models/statistics/champion_rival_item_build';
+import StatisticsChampionRivalMainItemBuild from '../models/statistics/champion_rival_main_item_build';
+import StatisticsChampionRivalRune from '../models/statistics/champion_rival_rune_build';
+import StatisticsChampionRivalShoes from '../models/statistics/champion_rival_shoes';
+import StatisticsChampionRivalSkillSet from '../models/statistics/champion_rival_skill_set';
+import StatisticsChampionRivalSpell from '../models/statistics/champion_rival_spell_build';
+import StatisticsChampionRivalStartItem from '../models/statistics/champion_rival_start_item';
+import StatisticsChampionRivalStat from '../models/statistics/champion_rival_stat';
+import StatisticsChampionRune from '../models/statistics/champion_rune';
+import StatisticsChampionShoes from '../models/statistics/champion_shoes';
+import StatisticsChampionSkillSet from '../models/statistics/champion_skill_set';
+import StatisticsChampionSpell from '../models/statistics/champion_spell';
+import StatisticsChampionStartItem from '../models/statistics/champion_start_item';
+import StatisticsChampionTimeWin from '../models/statistics/champion_time_win';
 import StatisticsGame, { IStatisticsGameModel } from '../models/statistics/game';
 import { getPositions } from '../models/util/game';
-import { getCombinedItemsByFinalItem, getConsumedItemIdList, getIntermediateItems, getShoesItemIdList } from '../models/util/static';
+import {
+  getConsumedItemIdList,
+  getIntermediateItems,
+  getShoesItemIdList,
+  getSubItemsOfFinalItem,
+} from '../models/util/static';
 import * as statistics from '../models/util/statistics';
-import { getItemEvents, getSkillLevelupSlots, getSoloKills, getStartItemIdList } from '../models/util/timeline';
+import {
+  getItemEvents,
+  getSkillLevelupSlots,
+  getSoloKills,
+  getStartItemIdList,
+} from '../models/util/timeline';
 
 const app = express();
 mongo.connect();
 
 const gameList = async (size: number) => {
-  const games = await StatisticsGame.aggregate([
-    {
-      $match: {
-        $or: [
-          {
-            isReady: false,
-          },
-          {
-            isReady: null,
-          },
-        ],
-        gameVersion: '9.17',
-      },
-    },
-    {
-      $sample: {
-        size,
-      },
-    },
-  ]).allowDiskUse(true);
+  const games = await StatisticsGame.find({ isReady: false })
+    .limit(size)
+    .lean();
   const result = [];
 
   for (let i = 0; i < games.length; i++) {
@@ -41,42 +56,76 @@ const gameList = async (size: number) => {
   return [...new Set(result)];
 };
 
+let savedData: any = {
+  rival: {
+    stat: {},
+    rune: {},
+    spell: {},
+    skill: {},
+    startItem: {},
+    mainItem: {},
+    itemBuild: {},
+    finalItem: {},
+    shoes: {},
+  },
+  ban: {},
+  skill: {},
+  spell: {},
+  startItem: {},
+  itemBuild: {},
+  mainItem: {},
+  finalItem: {},
+  finalItemBuild: {},
+  rune: {},
+  position: {},
+  shoes: {},
+  time: {},
+};
+
 async function start(
   game: IStatisticsGameModel,
   {
     consumedItemList,
     shoesItemList,
     intermediateItems,
-    combinedItemsByFinalItem,
+    subItemsOfFinalItem,
   }: {
     consumedItemList: number[];
     shoesItemList: number[];
     intermediateItems: { [id: string]: { itemId: number; into: number[] } };
-    combinedItemsByFinalItem: { [id: string]: string[] };
+    subItemsOfFinalItem: { [id: string]: string[] };
   }
 ) {
   const gameModel = await StatisticsGame.findOne({ gameId: game.gameId });
   if (!gameModel || (gameModel && gameModel.isReady)) {
-    return;
+    return Promise.resolve([]);
   }
 
   let timeline = await GameTimeline.findOne({ gameId: game.gameId });
   if (!timeline) {
-    return;
+    return Promise.resolve([]);
   }
 
   try {
     const gameVersion = game.gameVersion;
 
+    console.time('1');
     const positions = await getPositions(game, timeline);
+    console.timeEnd('1');
     const teams = game.teams;
 
+    console.time('2');
     const totalBannedChampions = [];
     const totalKillsByTeam: { [id: string]: number } = {};
     for (const team of teams) {
       totalBannedChampions.push(...team.bans.map((ban) => ban.championId));
     }
-    await statistics.saveChampionBans({ totalBannedChampions, gameVersion });
+    savedData.ban = await statistics.saveChampionBans({
+      data: savedData.ban,
+      totalBannedChampions,
+      gameVersion,
+    });
+    console.timeEnd('2');
 
     const rivals: { [id: string]: { championKey: number; participantId: number } } = {};
     for (let i = 0; i < game.participantIdentities.length; i++) {
@@ -116,6 +165,8 @@ async function start(
         };
       }
     }
+
+    const savedParticipants = [];
 
     for (let i = 0; i < game.participantIdentities.length; i++) {
       const promises = [];
@@ -165,24 +216,21 @@ async function start(
             if (item.type === 'ITEM_PURCHASED') {
               if (
                 !consumedItemList.includes(item.itemId) &&
-                (!!intermediateItems[item.itemId] || !!combinedItemsByFinalItem[item.itemId])
+                (!!intermediateItems[item.itemId] || !!subItemsOfFinalItem[item.itemId])
               ) {
-                const finals = itemBuild.filter((id) => !!combinedItemsByFinalItem[id]);
+                const finals = itemBuild.filter((id) => !!subItemsOfFinalItem[id]);
                 if (finals.length < 3) {
                   itemBuild.push(item.itemId);
                 }
               }
 
-              if (
-                !consumedItemList.includes(item.itemId) &&
-                !!combinedItemsByFinalItem[item.itemId]
-              ) {
+              if (!consumedItemList.includes(item.itemId) && !!subItemsOfFinalItem[item.itemId]) {
                 finalItemIds.push(item.itemId);
               }
 
               if (
                 !consumedItemList.includes(item.itemId) &&
-                !!combinedItemsByFinalItem[item.itemId] &&
+                !!subItemsOfFinalItem[item.itemId] &&
                 !shoesItemList.includes(item.itemId)
               ) {
                 mainItemIds.push(item.itemId);
@@ -191,7 +239,7 @@ async function start(
               if (
                 finalShoes.itemId === 0 &&
                 !consumedItemList.includes(item.itemId) &&
-                !!combinedItemsByFinalItem[item.itemId] &&
+                !!subItemsOfFinalItem[item.itemId] &&
                 shoesItemList.includes(item.itemId)
               ) {
                 finalShoes.itemId = item.itemId;
@@ -205,7 +253,7 @@ async function start(
 
               if (
                 !consumedItemList.includes(item.itemId) &&
-                (!!intermediateItems[item.itemId] || !!combinedItemsByFinalItem[item.itemId])
+                (!!intermediateItems[item.itemId] || !!subItemsOfFinalItem[item.itemId])
               ) {
                 index = itemBuild.lastIndexOf(item.itemId);
                 if (index !== -1) {
@@ -218,20 +266,21 @@ async function start(
               }
             }
           }
-          for (const finalItemId of finalItemIds) {
-            promises.push(
-              statistics.saveChampionFinalItem({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                item: finalItemId,
-              })
-            );
-          }
+
           finalItemIds = finalItemIds.slice(0, 6);
+          for (const finalItemId of finalItemIds) {
+            savedData.finalItem = await statistics.saveChampionFinalItem({
+              data: savedData.finalItem,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              item: finalItemId,
+            });
+          }
+
           mainItemIds = mainItemIds.slice(0, 3);
-          const finals = itemBuild.filter((id) => !!combinedItemsByFinalItem[id]);
+          const finals = itemBuild.filter((id) => !!subItemsOfFinalItem[id]);
           if (finals.length !== 3) {
             itemBuild = [];
           } else {
@@ -280,274 +329,239 @@ async function start(
             removedItemIndexList.reverse().forEach((index) => {
               itemIds.splice(index, 1);
             });
-            removedItemIndexList = [];
 
+            const insertedItemList = [];
             // 중간 아이템 개수 조절
-            const cloneCombinedItemsByFinalItem: { [key: string]: string[] } = {};
-            for (const key in combinedItemsByFinalItem) {
-              cloneCombinedItemsByFinalItem[key] = [...combinedItemsByFinalItem[key]];
-            }
+            const cloneSubItems: { [key: string]: string[] } = {};
             const result = itemIds.map((id) => ({ itemId: id.toString(), used: false }));
             for (let j = 0; j < result.length; j++) {
               const itemId = result[j].itemId;
-              if (!!combinedItemsByFinalItem[itemId]) {
-                let count = 0;
+              if (!!subItemsOfFinalItem[itemId]) {
+                cloneSubItems[itemId] = subItemsOfFinalItem[itemId].slice();
+
                 for (let k = 0; k < j; k++) {
-                  if (
-                    !result[k].used &&
-                    cloneCombinedItemsByFinalItem[itemId].includes(result[k].itemId)
-                  ) {
-                    const index = cloneCombinedItemsByFinalItem[itemId].indexOf(result[k].itemId);
-                    cloneCombinedItemsByFinalItem[itemId].splice(index, 1);
+                  if (!result[k].used && cloneSubItems[itemId].includes(result[k].itemId)) {
+                    const index = cloneSubItems[itemId].indexOf(result[k].itemId);
+                    cloneSubItems[itemId].splice(index, 1);
                     result[k].used = true;
-                    count++;
-                    if (
-                      combinedItemsByFinalItem[itemId].length > 1 &&
-                      count > combinedItemsByFinalItem[itemId].length - 1
-                    ) {
-                      removedItemIndexList.push(k);
-                    }
                   }
                 }
+
+                insertedItemList.push({
+                  index: j,
+                  items: [...cloneSubItems[itemId].map((item) => Number(item))],
+                });
               }
             }
 
-            removedItemIndexList.reverse().forEach((index) => {
-              itemIds.splice(index, 1);
+            insertedItemList.reverse().forEach((itemList) => {
+              itemIds.splice(itemList.index, 0, ...itemList.items);
             });
+
             itemBuild = itemIds.slice();
           }
           const startItemIds = getStartItemIdList(timeline, participantId);
 
-          promises.push(
-            ...[
-              statistics.saveChampionSpell({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                spells,
-              }),
-              statistics.saveChampionRune({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
+          savedData.spell = await statistics.saveChampionSpell({
+            data: savedData.spell,
+            championKey,
+            position,
+            gameVersion,
+            isWin,
+            spells,
+          });
+          savedData.rune = await statistics.saveChampionRune({
+            data: savedData.rune,
+            championKey,
+            position,
+            gameVersion,
+            isWin,
+            mainRuneStyle,
+            mainRunes,
+            subRuneStyle,
+            subRunes,
+            statRunes,
+          });
+
+          savedData.position = await statistics.saveChampionPosition({
+            data: savedData.position,
+            championKey,
+            position,
+            gameVersion,
+            isWin,
+            stats: {
+              kills: stats.kills,
+              deaths: stats.deaths,
+              assists: stats.assists,
+              damageTaken: stats.totalDamageTaken,
+              goldEarned: stats.goldEarned,
+              killPercent:
+                totalKillsByTeam[teamId] === 0
+                  ? 0
+                  : (participantData.stats.kills + participantData.stats.assists) /
+                    totalKillsByTeam[teamId],
+              timeCCingOthers: stats.timeCCingOthers,
+              timeCrowdControlDealt: stats.totalTimeCrowdControlDealt,
+              neutralMinionsKilled: stats.neutralMinionsKilled,
+              neutralMinionsKilledTeamJungle: stats.neutralMinionsKilledTeamJungle,
+              neutralMinionsKilledEnemyJungle: stats.neutralMinionsKilledEnemyJungle,
+              damageSelfMitigated: stats.damageSelfMitigated,
+              trueDamageDealtToChampions: stats.trueDamageDealtToChampions,
+              magicDamageDealtToChampions: stats.magicDamageDealtToChampions,
+              physicalDamageDealtToChampions: stats.physicalDamageDealtToChampions,
+              heal: stats.totalHeal,
+              unitsHealed: stats.totalUnitsHealed,
+            },
+          });
+
+          if (startItemIds.length > 0) {
+            savedData.startItem = await statistics.saveChampionStartItem({
+              data: savedData.startItem,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              items: startItemIds,
+            });
+            promises.push();
+          }
+
+          if (finalShoes.itemId !== 0) {
+            savedData.shoes = await statistics.saveChampionShoes({
+              data: savedData.shoes,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              shoes: finalShoes.itemId,
+              timestamp: finalShoes.timestamp,
+            });
+          }
+
+          if (skills.length >= 15) {
+            savedData.skill = await statistics.saveChampionSkillSet({
+              data: savedData.skill,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              skills,
+            });
+          }
+
+          if (itemBuild.length > 0) {
+            savedData.itemBuild = await statistics.saveChampionItemBuild({
+              data: savedData.itemBuild,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              items: itemBuild,
+            });
+          }
+
+          if (mainItemIds.length === 3) {
+            savedData.mainItem = await statistics.saveChampionMainItems({
+              data: savedData.mainItem,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              items: mainItemIds,
+            });
+          }
+
+          if (finalItemIds.length >= 6) {
+            savedData.finalItem = await statistics.saveChampionFinalItemBuild({
+              data: savedData.finalItemBuild,
+              championKey,
+              position,
+              gameVersion,
+              isWin,
+              items: finalItemIds,
+            });
+          }
+
+          savedData.time = await statistics.saveChampionTimeWin({
+            data: savedData.time,
+            championKey,
+            position,
+            gameMinutes,
+            gameVersion,
+            isWin,
+          });
+
+          if (rivals[participantId]) {
+            savedData.rival = await statistics.saveChampionRivalData({
+              data: savedData.rival,
+              championKey,
+              rivalChampionKey: rivals[participantId].championKey,
+              position,
+              gameVersion,
+              isWin,
+              shoes: {
+                itemId: finalShoes.itemId,
+                timestamp: finalShoes.timestamp,
+              },
+              finalItems: finalItemIds,
+              items: mainItemIds,
+              itemBuild: itemBuild,
+              startItems: startItemIds,
+              spells,
+              runeData: {
                 mainRuneStyle,
                 mainRunes,
                 subRuneStyle,
                 subRunes,
                 statRunes,
-              }),
-            ]
-          );
-
-          promises.push(
-            statistics.saveChampionPosition({
-              championKey,
-              position,
-              gameVersion,
-              isWin,
+              },
               stats: {
                 kills: stats.kills,
                 deaths: stats.deaths,
                 assists: stats.assists,
+                damageDealtToChampions: stats.totalDamageDealtToChampions,
                 damageTaken: stats.totalDamageTaken,
                 goldEarned: stats.goldEarned,
+                csPerMinutes: participantTimeline.creepsPerMinDeltas,
+                goldPerMinutes: participantTimeline.goldPerMinDeltas,
                 killPercent:
                   totalKillsByTeam[teamId] === 0
                     ? 0
                     : (participantData.stats.kills + participantData.stats.assists) /
                       totalKillsByTeam[teamId],
-                timeCCingOthers: stats.timeCCingOthers,
-                timeCrowdControlDealt: stats.totalTimeCrowdControlDealt,
-                neutralMinionsKilled: stats.neutralMinionsKilled,
-                neutralMinionsKilledTeamJungle: stats.neutralMinionsKilledTeamJungle,
-                neutralMinionsKilledEnemyJungle: stats.neutralMinionsKilledEnemyJungle,
-                damageSelfMitigated: stats.damageSelfMitigated,
-                trueDamageDealtToChampions: stats.trueDamageDealtToChampions,
-                magicDamageDealtToChampions: stats.magicDamageDealtToChampions,
-                physicalDamageDealtToChampions: stats.physicalDamageDealtToChampions,
-                heal: stats.totalHeal,
-                unitsHealed: stats.totalUnitsHealed,
+                soloKills: getSoloKills(
+                  timeline,
+                  participantId,
+                  rivals[participantId].participantId
+                ),
               },
-            })
-          );
-
-          if (startItemIds.length > 0) {
-            promises.push(
-              statistics.saveChampionStartItem({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                items: startItemIds,
-              })
-            );
+              skills,
+            });
           }
 
-          if (finalShoes.itemId !== 0) {
-            promises.push(
-              statistics.saveChampionShoes({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                shoes: finalShoes.itemId,
-                timestamp: finalShoes.timestamp,
-              })
-            );
-          }
-
-          if (skills.length >= 15) {
-            promises.push(
-              statistics.saveChampionSkillSet({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                skills,
-              })
-            );
-          }
-
-          if (itemBuild.length > 0) {
-            promises.push(
-              statistics.saveChampionItemBuild({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                items: itemBuild,
-              })
-            );
-          }
-
-          if (mainItemIds.length === 3) {
-            promises.push(
-              statistics.saveChampionMainItems({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                items: mainItemIds,
-              })
-            );
-          }
-
-          if (finalItemIds.length >= 5) {
-            promises.push(
-              statistics.saveChampionFinalItemBuild({
-                championKey,
-                position,
-                gameVersion,
-                isWin,
-                items: finalItemIds,
-              })
-            );
-          }
-
-          promises.push(
-            statistics.saveChampionTimeWin({
-              championKey,
-              position,
-              gameMinutes,
-              gameVersion,
-              isWin,
-            })
-          );
-
-          if (rivals[participantId]) {
-            promises.push(
-              statistics.saveChampionRivalData({
-                championKey,
-                rivalChampionKey: rivals[participantId].championKey,
-                position,
-                gameVersion,
-                isWin,
-                shoes: {
-                  itemId: finalShoes.itemId,
-                  timestamp: finalShoes.timestamp,
-                },
-                finalItems: finalItemIds,
-                items: mainItemIds,
-                itemBuild: itemBuild,
-                startItems: startItemIds,
-                spells,
-                runeData: {
-                  mainRuneStyle,
-                  mainRunes,
-                  subRuneStyle,
-                  subRunes,
-                  statRunes,
-                },
-                stats: {
-                  kills: stats.kills,
-                  deaths: stats.deaths,
-                  assists: stats.assists,
-                  damageDealtToChampions: stats.totalDamageDealtToChampions,
-                  damageTaken: stats.totalDamageTaken,
-                  goldEarned: stats.goldEarned,
-                  csPerMinutes: participantTimeline.creepsPerMinDeltas,
-                  goldPerMinutes: participantTimeline.goldPerMinDeltas,
-                  killPercent:
-                    totalKillsByTeam[teamId] === 0
-                      ? 0
-                      : (participantData.stats.kills + participantData.stats.assists) /
-                        totalKillsByTeam[teamId],
-                  soloKills: getSoloKills(
-                    timeline,
-                    participantId,
-                    rivals[participantId].participantId
-                  ),
-                },
-                skills,
-              })
-            );
-          }
-
-          await Promise.all(promises);
-
-          gameModel.isAnalyze[participantId] = true;
+          savedParticipants.push(participantId);
         } catch (err) {
-          if (err.response && err.response.status === 403) {
-            return Promise.reject(err);
-          }
-
           console.error(`[GAME PARTICIPANT ${participantId} ANALYZE ERROR]`);
-          if (err.response) {
-            console.log(err.response.data);
-          } else {
-            console.log(err);
-          }
-
-          gameModel.isAnalyze[participantId] = false;
+          console.log(err);
         }
       }
     }
 
-    gameModel.isReady = true;
-
-    return Promise.resolve();
+    return Promise.resolve(savedParticipants);
   } catch (err) {
     if (err.response) {
       console.log(err.response.data);
     } else {
       console.log(err);
     }
-
-    gameModel.isReady = false;
-
     return Promise.reject(err);
-  } finally {
-    await gameModel.save();
   }
 }
 
-gameList(1000).then(async (games) => {
+gameList(100).then(async (games) => {
   const consumedItemList = await getConsumedItemIdList();
   const intermediateItems = await getIntermediateItems();
-  const combinedItemsByFinalItem = await getCombinedItemsByFinalItem();
+  const subItemsOfFinalItem = await getSubItemsOfFinalItem();
   const shoesItemList = await getShoesItemIdList();
 
   if (games.length === 0) {
@@ -555,23 +569,150 @@ gameList(1000).then(async (games) => {
     return;
   }
 
+  console.log('START');
+  let isAnalyzeByGame: { [gameId: string]: boolean[] } = {};
+  let savedGames = [];
+
+  StatisticsGame.bulkWrite(
+    games.map((game) => ({
+      updateOne: {
+        filter: { gameId: game.gameId },
+        update: {
+          $set: {
+            isReady: true,
+            isAnalyze: isAnalyzeByGame[game.gameId],
+          },
+        },
+      },
+    }))
+  );
+  
   while (true) {
     const game = games.pop();
 
     try {
-      await start(game, {
+      isAnalyzeByGame[game.gameId] = [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ];
+      const savedParticipants = await start(game, {
         consumedItemList,
         shoesItemList,
         intermediateItems,
-        combinedItemsByFinalItem,
+        subItemsOfFinalItem,
       });
       console.log(`[${new Date().toLocaleTimeString('ko-KR')}] ${game.gameId}`);
+
+      for (const participantId of savedParticipants) {
+        isAnalyzeByGame[game.gameId][participantId] = true;
+      }
+      savedGames.push(game.gameId);
     } catch (err) {
       console.log(err);
     }
 
     if (games.length === 0) {
-      games.push(...(await gameList(1000)));
+      StatisticsGame.bulkWrite(
+        savedGames.map((gameId) => ({
+          updateOne: {
+            filter: { gameId },
+            update: {
+              $set: {
+                isReady: true,
+                isAnalyze: isAnalyzeByGame[gameId],
+              },
+            },
+          },
+        }))
+      );
+
+      const saveToDB = (dbData: any, database: Model<any>) => {
+        const list = [];
+        for (const key in dbData) {
+          list.push({ data: { ...dbData[key] }, pk: JSON.parse(key) });
+        }
+        if (list.length > 0) {
+          return database
+            .bulkWrite(
+              list.map((el) => ({
+                updateOne: {
+                  filter: { ...el.pk },
+                  update: {
+                    $set: { ...el.data },
+                  },
+                  upsert: true,
+                },
+              }))
+            )
+            .then((doc) => console.log(database.modelName, doc.upsertedCount, doc.modifiedCount));
+        } else {
+          return Promise.resolve();
+        }
+      };
+
+      await Promise.all([
+        saveToDB(savedData.rival.stat, StatisticsChampionRivalStat),
+        saveToDB(savedData.rival.spell, StatisticsChampionRivalSpell),
+        saveToDB(savedData.rival.rune, StatisticsChampionRivalRune),
+        saveToDB(savedData.rival.startItem, StatisticsChampionRivalStartItem),
+        saveToDB(savedData.rival.mainItem, StatisticsChampionRivalMainItemBuild),
+        saveToDB(savedData.rival.itemBuild, StatisticsChampionRivalItemBuild),
+        saveToDB(savedData.rival.finalItem, StatisticsChampionRivalFinalItem),
+        saveToDB(savedData.rival.shoes, StatisticsChampionRivalShoes),
+        saveToDB(savedData.rival.skill, StatisticsChampionRivalSkillSet),
+
+        saveToDB(savedData.ban, StatisticsChampionBan),
+        saveToDB(savedData.skill, StatisticsChampionSkillSet),
+        saveToDB(savedData.spell, StatisticsChampionSpell),
+        saveToDB(savedData.startItem, StatisticsChampionStartItem),
+        saveToDB(savedData.itemBuild, StatisticsChampionItemBuild),
+        saveToDB(savedData.mainItem, StatisticsChampionMainItem),
+        saveToDB(savedData.finalItem, StatisticsChampionFinalItem),
+        saveToDB(savedData.finalItemBuild, StatisticsChampionFinalItemBuild),
+        saveToDB(savedData.rune, StatisticsChampionRune),
+        saveToDB(savedData.position, StatisticsChampionPosition),
+        saveToDB(savedData.shoes, StatisticsChampionShoes),
+        saveToDB(savedData.time, StatisticsChampionTimeWin),
+      ]);
+
+      savedData = {
+        rival: {
+          stat: {},
+          rune: {},
+          spell: {},
+          skill: {},
+          startItem: {},
+          mainItem: {},
+          itemBuild: {},
+          finalItem: {},
+          shoes: {},
+        },
+        ban: {},
+        skill: {},
+        spell: {},
+        startItem: {},
+        itemBuild: {},
+        mainItem: {},
+        finalItem: {},
+        finalItemBuild: {},
+        rune: {},
+        position: {},
+        shoes: {},
+        time: {},
+      };
+      isAnalyzeByGame = {};
+      savedGames = [];
+
+      games.push(...(await gameList(100)));
+      console.log(`SAVED AND ADD GAME ${games.length}`);
       if (games.length === 0) {
         break;
       }

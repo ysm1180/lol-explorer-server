@@ -16,8 +16,7 @@ var statisticsChampionFinalItemSchema = new Schema({
   count: Number,
   win: Number,
   gameVersion: String,
-  items: [Number],
-  itemCount: Number,
+  item: Number,
 });
 
 export default model<IStatisticsChampionFinalItemModel>(

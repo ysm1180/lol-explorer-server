@@ -9,10 +9,16 @@ export interface IStatisticsChampionRivalRuneBuildModel extends Document {
   win: number;
   gameVersion: string;
   mainRuneStyle: number;
-  mainRunes: number[];
+  mainRune1: number;
+  mainRune2: number;
+  mainRune3: number;
+  mainRune4: number;
   subRuneStyle: number;
-  subRunes: number[];
-  statRunes: number[];
+  subRune1: number;
+  subRune2: number;
+  statRune1: number;
+  statRune2: number;
+  statRune3: number;
 }
 
 var statisticsChampionRivalRuneBuildSchema = new Schema({
@@ -23,10 +29,16 @@ var statisticsChampionRivalRuneBuildSchema = new Schema({
   win: Number,
   gameVersion: String,
   mainRuneStyle: Number,
-  mainRunes: [Number],
+  mainRune1: Number,
+  mainRune2: Number,
+  mainRune3: Number,
+  mainRune4: Number,
   subRuneStyle: Number,
-  subRunes: [Number],
-  statRunes: [Number],
+  subRune1: Number,
+  subRune2: Number,
+  statRune1: Number,
+  statRune2: Number,
+  statRune3: Number,
 });
 
 export default model<IStatisticsChampionRivalRuneBuildModel>(

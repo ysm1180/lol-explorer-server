@@ -44,7 +44,6 @@ const app = express();
 mongo.connect();
 
 const gameList = async (size: number) => {
-  console.time('get');
   const games = await StatisticsGame.find({ isReady: false })
     .limit(size)
     .lean();
@@ -61,7 +60,6 @@ const gameList = async (size: number) => {
       },
     }))
   );
-  console.timeEnd('get');
 
   return games;
 };

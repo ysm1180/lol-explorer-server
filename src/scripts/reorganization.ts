@@ -44,16 +44,26 @@ const app = express();
 mongo.connect();
 
 const gameList = async (size: number) => {
+  console.time('get');
   const games = await StatisticsGame.find({ isReady: false })
     .limit(size)
     .lean();
-  const result = [];
 
-  for (let i = 0; i < games.length; i++) {
-    result.push(games[i]);
-  }
+  StatisticsGame.bulkWrite(
+    games.map((game: any) => ({
+      updateOne: {
+        filter: { gameId: game.gameId },
+        update: {
+          $set: {
+            isReady: true,
+          },
+        },
+      },
+    }))
+  );
+  console.timeEnd('get');
 
-  return [...new Set(result)];
+  return games;
 };
 
 let savedData: any = {
@@ -97,7 +107,7 @@ async function start(
   }
 ) {
   const gameModel = await StatisticsGame.findOne({ gameId: game.gameId });
-  if (!gameModel || (gameModel && gameModel.isReady)) {
+  if (!gameModel) {
     return Promise.resolve([]);
   }
 
@@ -109,12 +119,9 @@ async function start(
   try {
     const gameVersion = game.gameVersion;
 
-    console.time('1');
     const positions = await getPositions(game, timeline);
-    console.timeEnd('1');
     const teams = game.teams;
 
-    console.time('2');
     const totalBannedChampions = [];
     const totalKillsByTeam: { [id: string]: number } = {};
     for (const team of teams) {
@@ -125,7 +132,6 @@ async function start(
       totalBannedChampions,
       gameVersion,
     });
-    console.timeEnd('2');
 
     const rivals: { [id: string]: { championKey: number; participantId: number } } = {};
     for (let i = 0; i < game.participantIdentities.length; i++) {
@@ -169,7 +175,6 @@ async function start(
     const savedParticipants = [];
 
     for (let i = 0; i < game.participantIdentities.length; i++) {
-      const promises = [];
       const participantId = game.participantIdentities[i].participantId;
       if (positions[participantId] !== POSITION.UNKNOWN) {
         try {
@@ -370,6 +375,7 @@ async function start(
             isWin,
             spells,
           });
+
           savedData.rune = await statistics.saveChampionRune({
             data: savedData.rune,
             championKey,
@@ -423,7 +429,6 @@ async function start(
               isWin,
               items: startItemIds,
             });
-            promises.push();
           }
 
           if (finalShoes.itemId !== 0) {
@@ -573,20 +578,6 @@ gameList(100).then(async (games) => {
   let isAnalyzeByGame: { [gameId: string]: boolean[] } = {};
   let savedGames = [];
 
-  StatisticsGame.bulkWrite(
-    games.map((game) => ({
-      updateOne: {
-        filter: { gameId: game.gameId },
-        update: {
-          $set: {
-            isReady: true,
-            isAnalyze: isAnalyzeByGame[game.gameId],
-          },
-        },
-      },
-    }))
-  );
-  
   while (true) {
     const game = games.pop();
 
@@ -609,7 +600,6 @@ gameList(100).then(async (games) => {
         intermediateItems,
         subItemsOfFinalItem,
       });
-      console.log(`[${new Date().toLocaleTimeString('ko-KR')}] ${game.gameId}`);
 
       for (const participantId of savedParticipants) {
         isAnalyzeByGame[game.gameId][participantId] = true;
@@ -652,7 +642,7 @@ gameList(100).then(async (games) => {
                 },
               }))
             )
-            .then((doc) => console.log(database.modelName, doc.upsertedCount, doc.modifiedCount));
+            .then(() => Promise.resolve());
         } else {
           return Promise.resolve();
         }
@@ -712,7 +702,7 @@ gameList(100).then(async (games) => {
       savedGames = [];
 
       games.push(...(await gameList(100)));
-      console.log(`SAVED AND ADD GAME ${games.length}`);
+      console.log(`[${new Date().toLocaleTimeString('ko-KR')}] SAVED AND ADD GAME ${games.length}`);
       if (games.length === 0) {
         break;
       }

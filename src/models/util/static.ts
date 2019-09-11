@@ -61,7 +61,7 @@ export async function getConsumedItemIdList() {
 
 export async function getIntermediateItems() {
   const version = await DDragonHelper.getLatestVersion();
-  const combinedItemsByFinalItem = await getCombinedItemsByFinalItem();
+  const combinedItemsByFinalItem = await getSubItemsOfFinalItem();
   const result: { [id: string]: { itemId: number; into: number[] } } = {};
   for (const key in combinedItemsByFinalItem) {
     for (const id of combinedItemsByFinalItem[key]) {
@@ -79,9 +79,10 @@ export async function getIntermediateItems() {
   return result;
 }
 
-export async function getCombinedItemsByFinalItem() {
+export async function getSubItemsOfFinalItem() {
   const items = await Item.find();
   const version = await DDragonHelper.getLatestVersion();
+  const itemDataList = await DDragonHelper.getItemList(version);
   const result: { [id: string]: string[] } = {};
   for (let i = 0; i < items.length; i++) {
     const rawData = await DDragonHelper.getItemData(version, items[i].key);
@@ -89,11 +90,15 @@ export async function getCombinedItemsByFinalItem() {
       if (rawData.into && rawData.into.length === 1) {
         const intoRawData = await DDragonHelper.getItemData(version, Number(rawData.into[0]));
         if (intoRawData.requiredAlly) {
-          result[items[i].key] = rawData.from;
+          result[items[i].key] = rawData.from.sort(
+            (a, b) => itemDataList[b].gold.total - itemDataList[a].gold.total
+          );
         }
       } else if (!rawData.into) {
         if (!rawData.requiredAlly) {
-          result[items[i].key] = rawData.from;
+          result[items[i].key] = rawData.from.sort(
+            (a, b) => itemDataList[b].gold.total - itemDataList[a].gold.total
+          );
         }
       }
     }

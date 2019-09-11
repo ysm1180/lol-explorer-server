@@ -193,13 +193,14 @@ export async function analyzeGame(demacia: Demacia, gameId: number) {
       .join('.');
     game = new StatisticsGame(gameData);
     game.isAnalyze = [false, false, false, false, false, false, false, false, false, false];
+    game.isReady = false;
     isGameSave = true;
   }
 
   try {
     const gameVersion = game.gameVersion;
 
-    if (gameVersion !== '9.17' && gameVersion !== '9.16' && gameVersion !== '9.15' && gameVersion !== '9.14') {
+    if (gameVersion !== '9.18' && gameVersion !== '9.17' && gameVersion !== '9.16' && gameVersion !== '9.15') {
       return Promise.resolve(false);
     }
 

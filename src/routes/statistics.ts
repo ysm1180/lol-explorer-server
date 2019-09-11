@@ -14,8 +14,16 @@ import StatisticsChampionRune from '../models/statistics/champion_rune';
 import StatisticsChampionShoes from '../models/statistics/champion_shoes';
 import StatisticsChampionSpell from '../models/statistics/champion_spell';
 import StatisticsChampionStartItem from '../models/statistics/champion_start_item';
+import StatisticsChampionItemBuild from '../models/statistics/champion_item_build';
+import StatisticsChampionFinalItem from '../models/statistics/champion_final_item';
+import StatisticsChampionFinalItemBuild from '../models/statistics/champion_final_item_build';
+import StatisticsChampionMainItem from '../models/statistics/champion_main_item';
 import StatisticsGame from '../models/statistics/game';
-import { getPredictPositions, IParticipantPositionData, updateChampionAnalysisByGame } from '../models/util/game';
+import {
+  getPredictPositions,
+  IParticipantPositionData,
+  updateChampionAnalysisByGame,
+} from '../models/util/game';
 import { getMostFrequentLane } from '../models/util/timeline';
 
 const router = Router();
@@ -260,6 +268,143 @@ router.get('/champion/:championId/:positionId', async function(req, res, next) {
       },
     ]);
 
+    const mainItems = await StatisticsChampionMainItem.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: '$items',
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          items: '$_id',
+          count: 1,
+          win: 1,
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+          win: -1,
+        },
+      },
+    ]);
+
+    const itemBuilds = await StatisticsChampionItemBuild.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: '$items',
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          items: '$_id',
+          count: 1,
+          win: 1,
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+          win: -1,
+        },
+      },
+    ]);
+
+    const finalItems = await StatisticsChampionFinalItem.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: '$item',
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          items: '$_id',
+          count: 1,
+          win: 1,
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+          win: -1,
+        },
+      },
+    ]);
+
+    const finalItemBuilds = await StatisticsChampionFinalItemBuild.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+          itemCount: 6,
+        },
+      },
+      {
+        $group: {
+          _id: '$items',
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          items: '$_id',
+          count: 1,
+          win: 1,
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+          win: -1,
+        },
+      },
+    ]);
+
     const easys = await StatisticsChampionRivalStat.aggregate([
       {
         $match: {
@@ -296,7 +441,7 @@ router.get('/champion/:championId/:positionId', async function(req, res, next) {
       },
       {
         $match: {
-          count: { $gt: 50 },
+          count: { $gt: 100 },
           winRate: { $gte: 50 },
         },
       },
@@ -343,7 +488,7 @@ router.get('/champion/:championId/:positionId', async function(req, res, next) {
       },
       {
         $match: {
-          count: { $gt: 50 },
+          count: { $gt: 100 },
           winRate: { $lt: 50 },
         },
       },
@@ -489,6 +634,10 @@ router.get('/champion/:championId/:positionId', async function(req, res, next) {
       counters,
       runeGroups,
       shoes,
+      mainItems,
+      itemBuilds,
+      finalItems,
+      finalItemBuilds,
     });
   } catch (err) {
     next(err);
@@ -520,6 +669,111 @@ router.get('/champion/recommend/:championId/:positionId', async function(req, re
       });
       return;
     }
+
+    const itemBuildTotalCount: number = (await StatisticsChampionItemBuild.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          count: {
+            $sum: '$count',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+        },
+      },
+    ]))[0].count;
+    const mostFrequencyItemBuilds = await StatisticsChampionItemBuild.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: '$items',
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          items: '$_id',
+          count: 1,
+          win: 1,
+        },
+      },
+      {
+        $sort: {
+          count: -1,
+        },
+      },
+      {
+        $limit: 1,
+      },
+    ]);
+    const mostWinItemBuilds = await StatisticsChampionItemBuild.aggregate([
+      {
+        $match: {
+          championKey: championId,
+          position: positionId,
+        },
+      },
+      {
+        $group: {
+          _id: '$items',
+          count: {
+            $sum: '$count',
+          },
+          win: {
+            $sum: '$win',
+          },
+        },
+      },
+      {
+        $match: {
+          count: { $gt: itemBuildTotalCount * 0.01 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          items: '$_id',
+          count: 1,
+          win: 1,
+          winRate: {
+            $multiply: [
+              {
+                $divide: ['$win', '$count'],
+              },
+              100,
+            ],
+          },
+        },
+      },
+      {
+        $sort: {
+          winRate: -1,
+        },
+      },
+      {
+        $limit: 1,
+      },
+    ]);
 
     const runeTotalCount: number = (await StatisticsChampionRune.aggregate([
       {
@@ -613,7 +867,7 @@ router.get('/champion/recommend/:championId/:positionId', async function(req, re
       },
       {
         $match: {
-          count: { $gt: runeTotalCount * 0.03 },
+          count: { $gt: runeTotalCount * 0.01 },
         },
       },
       {
@@ -722,7 +976,7 @@ router.get('/champion/recommend/:championId/:positionId', async function(req, re
       },
       {
         $match: {
-          count: { $gt: spellTotalCount * 0.03 },
+          count: { $gt: spellTotalCount * 0.01 },
         },
       },
       {
@@ -759,6 +1013,10 @@ router.get('/champion/recommend/:championId/:positionId', async function(req, re
       spells: {
         frequency: mostFrequencySpells[0],
         win: mostWinSpells[0],
+      },
+      builds: {
+        frequency: mostFrequencyItemBuilds[0],
+        win: mostWinItemBuilds[0],
       },
     });
   } catch (err) {

@@ -25,7 +25,6 @@ const truncateCollections = [
   'statistics_champion_spells',
   'statistics_champion_start_items',
   'statistics_champion_time_wins',
-  'statistics_champions',
 ];
 mongo.on('error', (_, ...args) => console.error(...args));
 mongo.on('open', (db) => {
@@ -51,32 +50,33 @@ mongo.on('open', (db) => {
       ],
     })
   );
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.2' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.3' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.4' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.5' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.6' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.7' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.8' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.9' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.10' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.11' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.12' }));
-  promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.13' }));
-  promises.push(db.collection('statistics_games').updateMany({}, { $set: { isReady: false } }));
-  promises.push(db.collection('statistics_summoners').updateMany({}, { $set: { isReady: false } }));
-
+  //promises.push(db.collection('statistics_games').deleteMany({ gameVersion: '9.14' }));
   promises.push(
     db
       .collection('statistics_games')
-      .find({}, { projection: { gameId: 1 } })
-      .toArray()
-      .then((docs) => {
-        db.collection('game_timelines').deleteMany({
-          gameId: { $nin: docs.map((doc) => doc.gameId) },
-        });
-      })
+      .updateMany(
+        {},
+        {
+          $set: {
+            isReady: false,
+            isAnalyze: [false, false, false, false, false, false, false, false, false, false],
+          },
+        }
+      )
   );
+  promises.push(db.collection('statistics_summoners').updateMany({}, { $set: { isReady: false } }));
+
+  // promises.push(
+  //   db
+  //     .collection('statistics_games')
+  //     .find({}, { projection: { gameId: 1 } })
+  //     .toArray()
+  //     .then((docs) => {
+  //       db.collection('game_timelines').deleteMany({
+  //         gameId: { $nin: docs.map((doc) => doc.gameId) },
+  //       });
+  //     })
+  // );
 
   Promise.all(promises).then(() => {
     console.log('Init DB Finish.');
